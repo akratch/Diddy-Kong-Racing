@@ -312,3 +312,43 @@ costs no instruction but shifts the allocator's phase. `reg` 300 → 255.
 A systematic sweep of the same trick across all 24 other assignments in the
 function (181 variants, every plausible staging variable) found no further
 gain, and coordinate descent re-converged at 355.
+
+### Steps 9-11 — 355 → 296 → 441 → **0 (MATCHED)**
+
+**Step 9 (296, community).** A contributor's scratch reached 98.94% with the
+flat accumulator `sum1 = A*x2 + B*y2 + C*z2 + D`, the interpolation deltas
+split out into their own statements ahead of the `t` branch, and a `y3 = x2;`
+inside the facet loop. Verified in our harness at 296 / 98.94%, 278
+instructions — one short of the target, with `insert=0 delete=100 reorder=0`.
+
+Analysis of that source showed the guard-tail restore was worth exactly two
+instructions: with two restore statements the build is 278 and the facet head
+schedules well; with three it is 280 and the facet head collapses to the bad
+flat schedule. No role assignment, staging insertion, or statement order
+reached 279 (432 + 649 + 252 variants swept).
+
+**Step 10 (441).** That dead end forced a re-reading of the block. The
+`swc1 f18/f20/f22 -> 0xa4/0xa0/0x9c` after the `blez` and the matching reloads
+after the loop are **compiler spills**, not source-level copies: `f18` is
+reused inside the loop as the scaled radius. Reading the origins straight into
+`x2/y2/z2` in the outer loop and deleting the entire save/restore block gives
+441 / 98.42% — a worse score, but 279 instructions with
+`insert=0 delete=0 reorder=0`, i.e. the instruction order is exact and the
+whole remaining penalty is a rotation of the low FP temp pool `{f4, f6, f8}`.
+
+**Step 11 (0).** On that base, computing the interpolation deltas `x, y, z`
+instead of `z, y, x` resolves the rotation. Score 0, every component zero.
+Integrated with `GLOBAL_ASM` removed; ROM Verify OK; Adventure One 99.48%.
+
+Codex was consulted for planning before step 10 and contributed the correct
+framing ("the early origin reloads are ugen-inserted spill reloads ... the
+practical lever is web coloring, not source statement order") along with 12
+ranked experiments. Its concrete suggestions — operand orientation, `register`
+storage class, explicit `f64` comparison webs, embedded assignment-expressions,
+fused coefficient loads, split facet-address forms — were all swept and all
+inert or worse; the useful contribution was the reframing.
+
+Methodological note for future functions: **exact score is not distance.** The
+decisive move looked like a 147-point regression. Steer by the structural
+components (`insert`/`delete`/`reorder`); register penalties are a phase
+problem that resolves once the structure is right.
