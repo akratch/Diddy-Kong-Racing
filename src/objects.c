@@ -5399,7 +5399,6 @@ u32 func_800179D0(void) {
 }
 
 // https://decomp.me/scratch/xNAlf
-#ifdef NON_EQUIVALENT
 s32 func_80017A18(ObjectModel *arg0, s32 arg1, s32 *arg2, f32 *arg3, f32 *arg4, f32 *arg5, f32 *arg6, f32 *arg7,
                   f32 *arg8, f32 *arg9, s8 *argA, f32 argB) {
     f32 *planes;
@@ -5408,25 +5407,25 @@ s32 func_80017A18(ObjectModel *arg0, s32 arg1, s32 *arg2, f32 *arg3, f32 *arg4, 
     f32 t;
     u32 var_a2; // u32 required here to force loading 1 instead of a3 into it
     s32 counter;
-    s32 spF8; // f8
+    s32 spF8;
     s32 var_s6;
     CollisionFacetPlanes *node;
-    s32 triIndex;
+    f32 pad; // unused; holds the stack slot at 0xEC
     s32 closestTri;
-    f32 A; // e4
-    f32 B; // e0
-    f32 C; // dc
-    f32 D; // d8
+    f32 A;
+    f32 B;
+    f32 C;
+    f32 D;
     f32 A1, B1, C1, D1;
     s32 redoLoop;
-    f32 spC0; // c0
-    f32 x1;   // bc
+    f32 spC0;
+    f32 x1;
     f32 y1;
-    f32 z1; // b4
+    f32 z1;
     f32 x3, y3, z3;
-    f32 x2; // a4
-    f32 y2; // a0
-    f32 z2; // 9c
+    f32 x2;
+    f32 y2;
+    f32 z2;
 
     spF8 = 0;
     planes = arg0->collisionPlanes;
@@ -5436,9 +5435,9 @@ s32 func_80017A18(ObjectModel *arg0, s32 arg1, s32 *arg2, f32 *arg3, f32 *arg4, 
         x1 = arg6[i];
         y1 = arg7[i];
         z1 = arg8[i];
-        y3 = arg3[i];
-        z3 = arg4[i];
-        sum2 = arg5[i];
+        x2 = arg3[i];
+        y2 = arg4[i];
+        z2 = arg5[i];
         spC0 = arg9[i] * argB;
 
         counter = 0;
@@ -5446,22 +5445,22 @@ s32 func_80017A18(ObjectModel *arg0, s32 arg1, s32 *arg2, f32 *arg3, f32 *arg4, 
             redoLoop = FALSE;
             j = 0;
             if (arg0->collisionFacetCount > 0) {
-                x2 = y3;
-                y2 = z3;
-                z2 = sum2;
                 do {
                     node = &arg0->collisionFacets[j];
-                    triIndex = node->basePlaneIndex;
+                    closestTri = node->basePlaneIndex;
 
-                    A = planes[4 * triIndex + 0];
-                    B = planes[4 * triIndex + 1];
-                    C = planes[4 * triIndex + 2];
-                    D = planes[4 * triIndex + 3];
-                    sum1 = (A * x2 + D) + (B * y2 + C * z2);
+                    A = planes[4 * closestTri + 0];
+                    B = planes[4 * closestTri + 1];
+                    C = planes[4 * closestTri + 2];
+                    D = planes[4 * closestTri + 3];
+                    sum1 = A * x2 + B * y2 + C * z2 + D;
                     sum2 = A * x1 + B * y1 + C * z1 + D;
-                    sum1 = sum1 - spC0;
-                    sum2 = sum2 - spC0;
+                    sum1 -= spC0;
+                    sum2 -= spC0;
                     if (sum1 >= -0.1 && sum2 < -0.1) {
+                        x3 = (x1 - x2);
+                        y3 = (y1 - y2);
+                        z3 = (z1 - z2);
                         if (sum1 != sum2) {
                             t = sum1 / (sum1 - sum2);
                         } else {
@@ -5469,15 +5468,12 @@ s32 func_80017A18(ObjectModel *arg0, s32 arg1, s32 *arg2, f32 *arg3, f32 *arg4, 
                         }
 
                         var_a2 = TRUE;
-                        z3 = (z1 - z2) * t + z2;
-                        y3 = (y1 - y2) * t + y2;
-                        x3 = (x1 - x2) * t + x2;
+                        x3 = x3 * t + x2;
+                        y3 = y3 * t + y2;
+                        z3 = z3 * t + z2;
 
                         for (k = 0; k < 3 && var_a2 == TRUE; k++) {
-                            // staging through triIndex (dead here) is
-                            // load-bearing: it fixes the GPR phase
-                            triIndex = node->edgeBisectorPlane[k];
-                            closestTri = triIndex;
+                            closestTri = node->edgeBisectorPlane[k];
 
                             A1 = planes[4 * closestTri + 0];
                             B1 = planes[4 * closestTri + 1];
@@ -5515,9 +5511,6 @@ s32 func_80017A18(ObjectModel *arg0, s32 arg1, s32 *arg2, f32 *arg3, f32 *arg4, 
                     }
                     j++;
                 } while (j < arg0->collisionFacetCount);
-                sum2 = z2;
-                z3 = y2;
-                y3 = x2;
             }
         } while (redoLoop);
 
@@ -5530,9 +5523,6 @@ s32 func_80017A18(ObjectModel *arg0, s32 arg1, s32 *arg2, f32 *arg3, f32 *arg4, 
 
     return spF8;
 }
-#else
-#pragma GLOBAL_ASM("asm/nonmatchings/objects/func_80017A18.s")
-#endif
 
 /**
  * Sets the active Taj challenge.
