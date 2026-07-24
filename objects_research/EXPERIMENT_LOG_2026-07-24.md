@@ -295,3 +295,20 @@ different bases.
 Integrated into `src/objects.c` behind `#ifdef NON_EQUIVALENT`; the ROM build
 was run and verifies OK. Pushed to `fork/match-trackbg-render-flashy` and to
 `https://github.com/akratch/dkr-func80017A18-wip`.
+
+### Step 8 — 400 → 355 (98.73%)
+
+Found by decomp-permuter from the 400 base: stage the edge-plane index
+through `triIndex`, which is dead at that point.
+
+```c
+triIndex = node->edgeBisectorPlane[k];
+closestTri = triIndex;
+```
+
+Same mechanism as the earlier `t = arg9[i]` fix — an extra assignment that
+costs no instruction but shifts the allocator's phase. `reg` 300 → 255.
+
+A systematic sweep of the same trick across all 24 other assignments in the
+function (181 variants, every plausible staging variable) found no further
+gain, and coordinate descent re-converged at 355.

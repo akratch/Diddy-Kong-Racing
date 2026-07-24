@@ -6,13 +6,13 @@ produced before the exact scorer existed and should be read as history only.
 
 ## Current state
 
-**400 / 98.57%**, integrated into `src/objects.c` behind
+**355 / 98.73%**, integrated into `src/objects.c` behind
 `#ifdef NON_EQUIVALENT` (so the ROM build still uses `GLOBAL_ASM` and
 verifies OK).
 
 ```text
-score=400  98.57%  max=27900
-stack=40  reg=300  reorder=60  insert=0  delete=0
+score=355  98.73%  max=27900
+stack=40  reg=255  reorder=60  insert=0  delete=0
 target_insns=279  candidate_insns=279
 ```
 

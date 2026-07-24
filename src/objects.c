@@ -5474,7 +5474,10 @@ s32 func_80017A18(ObjectModel *arg0, s32 arg1, s32 *arg2, f32 *arg3, f32 *arg4, 
                         x3 = (x1 - x2) * t + x2;
 
                         for (k = 0; k < 3 && var_a2 == TRUE; k++) {
-                            closestTri = node->edgeBisectorPlane[k];
+                            // staging through triIndex (dead here) is
+                            // load-bearing: it fixes the GPR phase
+                            triIndex = node->edgeBisectorPlane[k];
+                            closestTri = triIndex;
 
                             A1 = planes[4 * closestTri + 0];
                             B1 = planes[4 * closestTri + 1];
