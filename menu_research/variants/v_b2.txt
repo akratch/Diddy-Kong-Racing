@@ -1,0 +1,23 @@
+===DECLS===
+    s32 i;
+    char *trackName;
+    char *hubName;
+    s16 selectedTrack;
+    s32 trackSelectX;
+    s32 trackSelectY;
+    char *levelName;
+    s32 maxTrackY;
+    s8 *trackMenuIds;
+    Settings *settings;
+    TrackRenderDetails *cur;
+    s32 trackX;
+    s32 trackY;
+    s32 j;
+    s32 startIndex;
+    s16 temp;
+===CODE===
+                temp = (temp = gTrackSelectIDs[trackY][trackX]);
+                selectedTrack = gTrackSelectIDs[trackY][trackX];
+                cur->hubName = levelName;
+                if (selectedTrack != (-1))
+                {

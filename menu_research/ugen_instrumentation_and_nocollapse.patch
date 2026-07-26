@@ -1,0 +1,3498 @@
+--- ugen.c.pristine	2026-07-23 23:02:43
++++ ugen.c	2026-07-23 23:06:40
+@@ -2,7 +2,43 @@
+ #include <stdlib.h>
+ #include <stdio.h>
+ /* UGEN_FLTRACE */
++/* UGEN_CALLTRACE */
++static int ct_on_v = -1;
++static int ct_on(void){ if(ct_on_v<0) ct_on_v = getenv("UGEN_CALLTRACE")!=0; return ct_on_v; }
++static int ct_depth = 0;
++static int ct_enter(const char*n, int na, uint32_t x0, uint32_t x1, uint32_t x2, uint32_t x3){
++    ct_depth++;
++    if(ct_on()){
++        fprintf(stderr, "%d>%s", ct_depth, n);
++        if(na>0)fprintf(stderr, " %x", x0);
++        if(na>1)fprintf(stderr, " %x", x1);
++        if(na>2)fprintf(stderr, " %x", x2);
++        if(na>3)fprintf(stderr, " %x", x3);
++        fputc('\n', stderr);
++    }
++    return 0;
++}
++static void ct_exit(int *unused){ (void)unused; if(ct_on()) fprintf(stderr, "%d<\n", ct_depth); ct_depth--; }
++#define CT_FRAME(n,na,x0,x1,x2,x3) __attribute__((cleanup(ct_exit))) int _ctframe = ct_enter(n,na,x0,x1,x2,x3)
+ static int fl_trace_on(void){static int v=-1; if(v<0)v=getenv("UGEN_FLTRACE")!=0; return v;}
++/* UGEN_NOCOLLAPSE */
++static int nc_on(void){static int v=-1; if(v<0)v=getenv("UGEN_NOCOLLAPSE")!=0; return v;}
++/* UGEN_NOCOLLAPSE gate refinement, selected by the value of UGEN_NOCOLLAPSE:
++   "1"/"all" = every ILOD-into-register-dest store
++   "h"       = only 16-bit loads (size==2)
++   "hs"      = only signed 16-bit loads (lh: size==2 && dtype==Jdt(6))
++   "v1"      = only when the destination register is $3 (v1)
++   "v1h"     = dest==$3 and signed 16-bit */
++static int nc_strcmp(const char*a, const char*b){ while(*a && *a==*b){a++;b++;} return *a-*b; }
++static int nc_gate(unsigned dest, unsigned dtype, unsigned size){
++    const char *m = getenv("UGEN_NOCOLLAPSE");
++    if(!m) return 0;
++    if(!nc_strcmp(m,"h"))   return size==2;
++    if(!nc_strcmp(m,"hs"))  return size==2 && dtype==6;
++    if(!nc_strcmp(m,"v1"))  return dest==3;
++    if(!nc_strcmp(m,"v1h")) return dest==3 && size==2 && dtype==6;
++    return 1;
++}
+ static uint32_t s0, s1, s2, s3, s4, s5, s6, s7, fp;
+ static const uint32_t rodata[] = {
+ 0x77000000,0x7567656e,0x3a20696e,0x7465726e,0x616c2065,0x72726f72,0x206f7065,0x6e696e67,
+@@ -2538,6 +2574,7 @@
+ }
+ 
+ static void f_open_bin_file(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_open_bin_file",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -2642,6 +2679,7 @@
+ }
+ 
+ static void f_close_bin_file(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_close_bin_file",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -2679,6 +2717,7 @@
+ }
+ 
+ static void f_output_inst_bin(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_output_inst_bin",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -2900,6 +2939,7 @@
+ }
+ 
+ static void f_cat_files(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_cat_files",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -3298,6 +3338,7 @@
+ }
+ 
+ static void f_warning(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_warning",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -3512,6 +3553,7 @@
+ }
+ 
+ static uint32_t f_fold_constant(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_fold_constant",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -4752,6 +4794,7 @@
+ }
+ 
+ static uint32_t f_fold_identities(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_fold_identities",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -4968,6 +5011,7 @@
+ }
+ 
+ static uint32_t f_fold_idempotents(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_fold_idempotents",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -5080,6 +5124,7 @@
+ }
+ 
+ static void f_put_integer_ws(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_put_integer_ws",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -5141,6 +5186,7 @@
+ }
+ 
+ static void f_put_sym(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_put_sym",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -5364,6 +5410,7 @@
+ }
+ 
+ static void f_hex8(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_hex8",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -5428,6 +5475,7 @@
+ }
+ 
+ static void f_put_hex10(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_put_hex10",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -5475,6 +5523,7 @@
+ }
+ 
+ static void f_hex_2(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_hex_2",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -5510,6 +5559,7 @@
+ }
+ 
+ static void f_put_alpha(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_put_alpha",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -5617,6 +5667,7 @@
+ }
+ 
+ static void f_put_string(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_put_string",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -5759,6 +5810,7 @@
+ }
+ 
+ static void f_write_instruction(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_write_instruction",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -7017,6 +7069,7 @@
+ }
+ 
+ static void f_print_source(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_print_source",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -7447,6 +7500,7 @@
+ }
+ 
+ static void f_write_directive(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_write_directive",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -8652,6 +8706,7 @@
+ }
+ 
+ static void f_output_inst_ascii(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_output_inst_ascii",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -8768,6 +8823,7 @@
+ }
+ 
+ static void f_set_domtag(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_set_domtag",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -8794,6 +8850,7 @@
+ }
+ 
+ static uint32_t f_get_domtag(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_get_domtag",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -8822,6 +8879,7 @@
+ }
+ 
+ static uint32_t f_search_label(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_search_label",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -8879,6 +8937,7 @@
+ }
+ 
+ static uint32_t f_find_label(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_find_label",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -8965,6 +9024,7 @@
+ }
+ 
+ static void f_init_build(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_init_build",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -11111,6 +11171,7 @@
+ }
+ 
+ static uint32_t f_build_tree(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_build_tree",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -18515,6 +18576,7 @@
+ }
+ 
+ static void f_save_i_ptrs(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_save_i_ptrs",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -18547,6 +18609,7 @@
+ }
+ 
+ static void f_restore_i_ptrs(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_restore_i_ptrs",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -18622,6 +18685,7 @@
+ }
+ 
+ static void f_init_ibuffer(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_init_ibuffer",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -18794,6 +18858,7 @@
+ }
+ 
+ static void f_grow_ibuffer(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_grow_ibuffer",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -19191,6 +19256,7 @@
+ }
+ 
+ static uint32_t f_create_local_label(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_create_local_label",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -19345,6 +19411,7 @@
+ }
+ 
+ static void f_emit_vers(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_emit_vers",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -19395,6 +19462,7 @@
+ }
+ 
+ static void f_emit_rob(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rob",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -19651,6 +19719,7 @@
+ }
+ 
+ static void f_emit_rab(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rab",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -19906,6 +19975,7 @@
+ }
+ 
+ static void f_emit_rrab(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rrab",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -20154,6 +20224,7 @@
+ }
+ 
+ static void f_emit_rllb(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rllb",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -20420,6 +20491,7 @@
+ }
+ 
+ static void f_emit_ra(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_ra",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -20647,6 +20719,7 @@
+ }
+ 
+ static void f_emit_ri_(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_ri_",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -20863,6 +20936,7 @@
+ }
+ 
+ static void f_emit_rii(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rii",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -20914,6 +20988,7 @@
+ }
+ 
+ static void f_emit_rfi(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_emit_rfi",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -21367,6 +21442,7 @@
+ }
+ 
+ static void f_emit_rrfi(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_emit_rrfi",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -21581,6 +21657,7 @@
+ }
+ 
+ static void f_emit_rrr(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rrr",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -21829,6 +21906,7 @@
+ }
+ 
+ static void f_emit_rri_(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rri_",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -22072,6 +22150,7 @@
+ }
+ 
+ static void f_emit_rrri(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rrri",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -22312,6 +22391,7 @@
+ }
+ 
+ static void f_emit_rr(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_emit_rr",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -22524,6 +22604,7 @@
+ }
+ 
+ static void f_emit_a(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_a",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -22720,6 +22801,7 @@
+ }
+ 
+ static void f_emit_r(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_emit_r",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -22917,6 +22999,7 @@
+ }
+ 
+ static void f_emit_i(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_emit_i",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -23097,6 +23180,7 @@
+ }
+ 
+ static void f_emit_rrll(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rrll",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -23330,6 +23414,7 @@
+ }
+ 
+ static void f_emit_rll(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_emit_rll",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -23544,6 +23629,7 @@
+ }
+ 
+ static void f_emit_ll(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_emit_ll",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -23727,6 +23813,7 @@
+ }
+ 
+ static void f_emit_rill(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_rill",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -23952,6 +24039,7 @@
+ }
+ 
+ static void f_define_label(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_define_label",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -24030,6 +24118,7 @@
+ }
+ 
+ static void f_emit_itext(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_emit_itext",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -24238,6 +24327,7 @@
+ }
+ 
+ static void f_demit_itext(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_demit_itext",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -24446,6 +24536,7 @@
+ }
+ 
+ static void f_emit_dir0(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_emit_dir0",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -24564,6 +24655,7 @@
+ }
+ 
+ static void f_emit_dir1(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_emit_dir1",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -24639,6 +24731,7 @@
+ }
+ 
+ static void f_emit_dir2(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_dir2",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -24783,6 +24876,7 @@
+ }
+ 
+ static void f_emit_alias(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_emit_alias",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -24880,6 +24974,7 @@
+ }
+ 
+ static void f_emit_regmask(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_emit_regmask",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -24960,6 +25055,7 @@
+ }
+ 
+ static void f_emit_loopno(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_emit_loopno",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -25037,6 +25133,7 @@
+ }
+ 
+ static void f_emit_dir_ll(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_emit_dir_ll",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -25147,6 +25244,7 @@
+ }
+ 
+ static void f_demit_rob_(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_demit_rob_",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -25290,6 +25388,7 @@
+ }
+ 
+ static void f_demit_ri(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_demit_ri",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -25423,6 +25522,7 @@
+ }
+ 
+ static void f_demit_rr(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_demit_rr",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -25542,6 +25642,7 @@
+ }
+ 
+ static void f_demit_a(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_demit_a",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -25673,6 +25774,7 @@
+ }
+ 
+ static void f_demit_regmask(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_demit_regmask",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -25753,6 +25855,7 @@
+ }
+ 
+ static void f_demit_rrr(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_demit_rrr",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -25883,6 +25986,7 @@
+ }
+ 
+ static void f_demit_rri(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_demit_rri",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26005,6 +26109,7 @@
+ }
+ 
+ static void f_demit_rrll(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_demit_rrll",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26134,6 +26239,7 @@
+ }
+ 
+ static void f_demit_i(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_demit_i",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26256,6 +26362,7 @@
+ }
+ 
+ static void f_demit_ra(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_demit_ra",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26374,6 +26481,7 @@
+ }
+ 
+ static void f_demit_dir0(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_demit_dir0",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26487,6 +26595,7 @@
+ }
+ 
+ static void f_demit_dir1(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_demit_dir1",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26586,6 +26695,7 @@
+ }
+ 
+ static void f_demit_dir2(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_demit_dir2",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26757,6 +26867,7 @@
+ }
+ 
+ static void f_demit_edata(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_demit_edata",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26833,6 +26944,7 @@
+ }
+ 
+ static void f_demit_weakext(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_demit_weakext",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -26905,6 +27017,7 @@
+ }
+ 
+ static void f_emit_cpload(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_cpload",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27003,6 +27116,7 @@
+ }
+ 
+ static void f_ddefine_label(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_ddefine_label",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27081,6 +27195,7 @@
+ }
+ 
+ static void f_define_exception_label(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_define_exception_label",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27147,6 +27262,7 @@
+ }
+ 
+ static void f_append_i(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_append_i",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27215,6 +27331,7 @@
+ }
+ 
+ static void f_append_d(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_append_d",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27283,6 +27400,7 @@
+ }
+ 
+ static void f_clear_ibuffer(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_clear_ibuffer",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27351,6 +27469,7 @@
+ }
+ 
+ static void f_emit_vreg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_emit_vreg",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27395,6 +27514,7 @@
+ }
+ 
+ static void f_emit_pic(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_emit_pic",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27447,6 +27567,7 @@
+ }
+ 
+ static void f_demit_cpalias(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_demit_cpalias",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27493,6 +27614,7 @@
+ }
+ 
+ static void f_emit_cpalias(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_emit_cpalias",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -27539,6 +27661,7 @@
+ }
+ 
+ static void f_emit_cpadd(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_emit_cpadd",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -28681,6 +28804,7 @@
+ }
+ 
+ static void f_emit_branch_rrll(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_branch_rrll",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -29650,6 +29774,7 @@
+ }
+ 
+ static void f_emit_branch_rill(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_branch_rill",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -30410,6 +30535,7 @@
+ }
+ 
+ static void f_emit_trap_rri(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_trap_rri",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -31013,6 +31139,7 @@
+ }
+ 
+ static void f_emit_trap_ri(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_trap_ri",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -33323,6 +33450,7 @@
+ }
+ 
+ static void f_dw_emit_rrr(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_dw_emit_rrr",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -35650,6 +35778,7 @@
+ }
+ 
+ static void f_dw_emit_rri(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_dw_emit_rri",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -36726,6 +36855,7 @@
+ }
+ 
+ static void f_dw_emit_rr(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_dw_emit_rr",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -36886,6 +37016,7 @@
+ }
+ 
+ static void f_gen_entry_exit(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_gen_entry_exit",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -37874,6 +38005,7 @@
+ }
+ 
+ static void f_gen_entry(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_gen_entry",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -38241,6 +38373,7 @@
+ }
+ 
+ static void f_clear_saved_regs(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_clear_saved_regs",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -38273,6 +38406,7 @@
+ }
+ 
+ static uint32_t f_is_empty_saved_regs(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_is_empty_saved_regs",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -38307,6 +38441,7 @@
+ }
+ 
+ static void f_home_parameters(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_home_parameters",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -38780,6 +38915,7 @@
+ }
+ 
+ static void f_gen_reg_save_restore(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_gen_reg_save_restore",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -40158,6 +40294,7 @@
+ }
+ 
+ static void f_gen_reg_save(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_gen_reg_save",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -40732,6 +40869,7 @@
+ }
+ 
+ static void f_demit_mask(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_demit_mask",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -40784,6 +40922,7 @@
+ }
+ 
+ static void f_demit_frame(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_demit_frame",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -40834,6 +40973,7 @@
+ }
+ 
+ static void f_emit_file(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_file",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -41173,6 +41313,7 @@
+ }
+ 
+ static void f_emit_optimize_level(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_emit_optimize_level",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -41222,6 +41363,7 @@
+ }
+ 
+ static uint32_t f_is_end_return(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_end_return",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -41303,6 +41445,7 @@
+ }
+ 
+ static void f_move_dreg_to_regs(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_move_dreg_to_regs",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -41555,6 +41698,7 @@
+ }
+ 
+ static void f_move_two_regs(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_move_two_regs",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -41633,6 +41777,7 @@
+ }
+ 
+ static uint32_t f_fasm(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_fasm",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -41914,6 +42059,7 @@
+ }
+ 
+ static uint32_t f_fop(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_fop",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -42203,6 +42349,7 @@
+ }
+ 
+ static uint32_t f_uop_to_asm(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_uop_to_asm",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -42473,6 +42620,7 @@
+ }
+ 
+ static void f_jump(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_jump",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -43002,6 +43150,7 @@
+ }
+ 
+ static void f_trap(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_trap",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -43611,6 +43760,7 @@
+ }
+ 
+ static uint32_t f_is_saved_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_saved_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -43675,6 +43825,7 @@
+ }
+ 
+ static uint32_t f_is_parm_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_parm_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -43731,6 +43882,7 @@
+ }
+ 
+ static uint32_t f_is_fp_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_fp_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -43760,6 +43912,7 @@
+ }
+ 
+ static void f_restore_from_temp(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_restore_from_temp",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -44417,6 +44570,7 @@
+ }
+ 
+ static uint32_t f_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -44622,6 +44776,7 @@
+ }
+ 
+ static void f_binary_regs(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_binary_regs",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -45001,6 +45156,7 @@
+ }
+ 
+ static uint32_t f_flt_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_flt_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -45339,6 +45495,7 @@
+ }
+ 
+ static void f_binary_flt_regs(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_binary_flt_regs",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -45401,6 +45558,7 @@
+ }
+ 
+ static uint32_t f_get_dest(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_get_dest",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -45576,6 +45734,7 @@
+ }
+ 
+ static void f_move_to_dest(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_move_to_dest",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -45879,6 +46038,7 @@
+ }
+ 
+ static uint32_t f_lsopc(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_lsopc",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -46993,6 +47153,7 @@
+ }
+ 
+ static void f_loadstore(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_loadstore",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -47793,6 +47954,7 @@
+ }
+ 
+ static void f_iloadistore(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_iloadistore",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -48509,6 +48671,7 @@
+ }
+ 
+ static void f_rloadrstore(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_rloadrstore",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -48998,6 +49161,7 @@
+ }
+ 
+ static void f_loadstore_for_two_words(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_loadstore_for_two_words",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -49080,6 +49244,7 @@
+ }
+ 
+ static void f_unaligned_loadstore_for_fp_word(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_unaligned_loadstore_for_fp_word",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -49177,6 +49342,7 @@
+ }
+ 
+ static void f_unaligned_loadstore_for_two_fp_w(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_unaligned_loadstore_for_two_fp_w",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -49342,6 +49508,7 @@
+ }
+ 
+ static void f_loadstore_for_two_fp_words(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_loadstore_for_two_fp_words",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -49858,6 +50025,7 @@
+ }
+ 
+ static void f_unaligned_loadstore(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_unaligned_loadstore",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -50051,6 +50219,7 @@
+ }
+ 
+ static void f_eval_2ops(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_eval_2ops",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -50132,6 +50301,7 @@
+ }
+ 
+ static void f_eval_fp_cond(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_eval_fp_cond",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -50309,6 +50479,7 @@
+ }
+ 
+ static void f_eval_fp_min_max(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_eval_fp_min_max",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -50613,6 +50784,7 @@
+ }
+ 
+ static void f_eval2(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_eval2",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -50754,6 +50926,7 @@
+ }
+ 
+ static uint32_t f_ureg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_ureg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -50796,6 +50969,7 @@
+ }
+ 
+ static uint32_t f_copy(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_copy",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -50900,6 +51074,7 @@
+ }
+ 
+ static void f_eval_mov(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_eval_mov",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -52818,6 +52993,7 @@
+ }
+ 
+ static void f_get_ops(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_get_ops",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -53147,6 +53323,7 @@
+ }
+ 
+ static void f_eval_irel(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_eval_irel",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -53619,6 +53796,7 @@
+ }
+ 
+ static void f_save_vreg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_save_vreg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -53852,6 +54030,7 @@
+ }
+ 
+ static uint32_t f_pass_in_register(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_pass_in_register",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -53924,6 +54103,7 @@
+ }
+ 
+ static void f_load_parm_vreg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_load_parm_vreg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -54083,6 +54263,7 @@
+ }
+ 
+ static uint32_t f_in_parm_regs(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_in_parm_regs",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -54139,6 +54320,7 @@
+ }
+ 
+ static void f_gen_regs(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_gen_regs",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -54441,6 +54623,7 @@
+ }
+ 
+ static uint32_t f_get_saved_regs_size(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_get_saved_regs_size",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -54776,6 +54959,7 @@
+ }
+ 
+ static void f_unhome_parms(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_unhome_parms",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -54955,6 +55139,7 @@
+ }
+ 
+ static void f_home_parms(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_home_parms",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -55327,6 +55512,7 @@
+ }
+ 
+ static void f_clean_tree(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_clean_tree",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -55443,6 +55629,7 @@
+ }
+ 
+ static void f_clear_pmov_regs(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_clear_pmov_regs",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -55475,6 +55662,7 @@
+ }
+ 
+ static void f_save_pmov_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_save_pmov_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -55520,6 +55708,7 @@
+ }
+ 
+ static void f_load_pmov_regs(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_load_pmov_regs",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -55610,6 +55799,7 @@
+ }
+ 
+ static uint32_t f_cvt_tab(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_cvt_tab",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -55858,6 +56048,7 @@
+ }
+ 
+ static uint32_t f_rnd_tab(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_rnd_tab",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -56018,6 +56209,7 @@
+ }
+ 
+ static void f_eval(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_eval",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -58264,6 +58456,13 @@
+ //nop;
+ a0 = MEM_U32(s6 + 0);
+ a1 = fp;
++/* UGEN_NOCOLLAPSE: defer the ILOD-into-web collapse — evaluate a memory-load RHS
++   into a pool temp (free-queue GET) instead of straight into the colored web reg;
++   the generic f_move_to_dest below then emits the (as1-dissolvable) move. */
++if (getenv("UGEN_NCDEBUG") && MEM_U8(a0 + 32) == 0x36)
++    fprintf(stderr, "NC-CAND dest=%u dtype=%x size=%u\n",
++        fp & 0xff, MEM_U8(a0 + 33) & 0x1f, MEM_U32(a0 + 40));
++if (nc_on() && MEM_U8(a0 + 32) == 0x36 /* Uilod */ && nc_gate(fp & 0xff, MEM_U8(a0 + 33) & 0x1f, MEM_U32(a0 + 40))) a1 = 0x48;
+ f_eval(mem, sp, a0, a1);
+ goto L42ec70;
+ a1 = fp;
+@@ -67474,6 +67673,7 @@
+ }
+ 
+ static void f_init_eval(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_init_eval",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -67509,6 +67709,7 @@
+ }
+ 
+ static void f_load_fp_literal(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_load_fp_literal",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -67566,6 +67767,7 @@
+ }
+ 
+ static void f_eval_int_flt_cvt(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_eval_int_flt_cvt",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -67942,6 +68144,7 @@
+ }
+ 
+ static void f_eval_flt_int_cvt(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_eval_flt_int_cvt",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -69853,6 +70056,7 @@
+ }
+ 
+ static void f_eval_int_int_cvt(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_eval_int_int_cvt",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -69939,6 +70143,7 @@
+ }
+ 
+ static void f_eval_flt_flt_cvt(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_eval_flt_flt_cvt",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70076,6 +70281,7 @@
+ }
+ 
+ static uint32_t f_add_overflow(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_add_overflow",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70120,6 +70326,7 @@
+ }
+ 
+ static uint32_t f_sub_overflow(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_sub_overflow",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70162,6 +70369,7 @@
+ }
+ 
+ static uint32_t f_is_constant(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_constant",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70201,6 +70409,7 @@
+ }
+ 
+ static uint64_t f_llconst(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_llconst",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70261,6 +70470,7 @@
+ }
+ 
+ static uint32_t f_fold(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_fold",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70564,6 +70774,7 @@
+ }
+ 
+ static uint32_t f_fold1(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_fold1",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70835,6 +71046,7 @@
+ }
+ 
+ static uint32_t f_frame_offset(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_frame_offset",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70890,6 +71102,7 @@
+ }
+ 
+ static uint32_t f_frame_offset1(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_frame_offset1",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70941,6 +71154,7 @@
+ }
+ 
+ static void f_st_feinit(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_st_feinit",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70965,6 +71179,7 @@
+ }
+ 
+ static void f_swap_tree(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_swap_tree",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -70989,6 +71204,7 @@
+ }
+ 
+ static void f_swap_int(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_swap_int",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -72964,6 +73180,7 @@
+ }
+ 
+ static void f_labelopt(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_labelopt",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -73341,6 +73558,7 @@
+ }
+ 
+ static void f_reset_pool(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_reset_pool",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -73379,6 +73597,7 @@
+ }
+ 
+ static void f_select_data_section(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_select_data_section",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -73436,6 +73655,7 @@
+ }
+ 
+ static void f_emit_list(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_emit_list",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -73498,6 +73718,7 @@
+ }
+ 
+ static void f_output_pool(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_output_pool",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -73692,6 +73913,7 @@
+ }
+ 
+ static uint32_t f_new_lit(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_new_lit",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -73854,6 +74076,7 @@
+ }
+ 
+ static void f_add_to_list_no_check(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_add_to_list_no_check",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -73895,6 +74118,7 @@
+ }
+ 
+ static uint32_t f_valu_equ(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_valu_equ",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -74018,6 +74242,7 @@
+ }
+ 
+ static uint32_t f_add_to_list(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_add_to_list",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -74103,6 +74328,7 @@
+ }
+ 
+ static uint32_t f_add_to_pool(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_add_to_pool",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -74357,6 +74583,7 @@
+ }
+ 
+ static void f_insert(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_insert",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -74382,6 +74609,7 @@
+ }
+ 
+ static void f_append(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_append",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -74408,6 +74636,7 @@
+ }
+ 
+ static uint32_t f_make_new_label(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_make_new_label",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -74458,6 +74687,7 @@
+ }
+ 
+ static uint32_t f_make_new_jump(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_make_new_jump",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -74495,6 +74725,7 @@
+ }
+ 
+ static uint32_t f_cmp_tree(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_cmp_tree",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -75912,6 +76143,7 @@
+ }
+ 
+ static uint32_t f_cmp_tree_again(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_cmp_tree_again",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -76435,6 +76667,7 @@
+ }
+ 
+ static void f_move_label(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_move_label",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -76477,6 +76710,7 @@
+ }
+ 
+ static uint32_t f_get_prior_stm(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_get_prior_stm",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -76543,6 +76777,7 @@
+ }
+ 
+ static uint32_t f_get_prior_stm1(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_get_prior_stm1",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -76617,6 +76852,7 @@
+ }
+ 
+ static uint32_t f_find_br(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_find_br",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -76720,6 +76956,7 @@
+ }
+ 
+ static void f_match_uconds(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_match_uconds",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -77033,6 +77270,7 @@
+ }
+ 
+ static uint32_t f_cmp_br(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_cmp_br",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -77212,6 +77450,7 @@
+ }
+ 
+ static void f_match_conds(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_match_conds",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -77539,6 +77778,7 @@
+ }
+ 
+ static void f_cross_jump(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_cross_jump",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -77703,6 +77943,7 @@
+ }
+ 
+ static void f_set_opts(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_set_opts",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -77901,6 +78142,7 @@
+ }
+ 
+ static uint32_t f_pass_in_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_pass_in_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -77938,6 +78180,7 @@
+ }
+ 
+ static uint32_t f_parm_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_parm_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -78023,6 +78266,7 @@
+ }
+ 
+ static void f_map_pdefs_to_regs(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_map_pdefs_to_regs",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -78168,6 +78412,7 @@
+ }
+ 
+ static void f_map_pars_to_regs(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_map_pars_to_regs",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -78512,6 +78757,7 @@
+ }
+ 
+ static uint32_t f_check_amt(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_check_amt",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -78630,6 +78876,7 @@
+ }
+ 
+ static void f_check_amt_ref(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_check_amt_ref",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -78817,6 +79064,7 @@
+ }
+ 
+ static void f_fix_amt_ref(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_fix_amt_ref",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -79037,6 +79285,7 @@
+ }
+ 
+ static uint32_t f_find_non_special_reg(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_find_non_special_reg",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -79212,6 +79461,7 @@
+ }
+ 
+ static uint32_t f_kind_of_register(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_kind_of_register",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -79243,6 +79493,7 @@
+ }
+ 
+ static void f_init_regs(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_init_regs",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -79654,6 +79905,7 @@
+ }
+ 
+ static void f_fill_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_fill_reg",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -79685,6 +79937,7 @@
+ }
+ 
+ static void f_copy_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_copy_reg",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -79743,6 +79996,7 @@
+ }
+ 
+ static uint32_t f_list_is_empty(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_list_is_empty",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -79767,6 +80021,7 @@
+ }
+ 
+ static void f_print_regs(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_print_regs",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -79918,6 +80173,7 @@
+ }
+ 
+ static uint32_t f_remove_direg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_remove_direg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -80015,6 +80271,7 @@
+ }
+ 
+ static uint32_t f_get_head(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_get_head",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -80045,6 +80302,7 @@
+ }
+ 
+ static uint32_t f_remove_head(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_remove_head",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -80098,6 +80356,7 @@
+ }
+ 
+ static void f_append_to_list(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_append_to_list",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -80171,6 +80430,7 @@
+ }
+ 
+ static uint32_t f_remove_from_list(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_remove_from_list",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -80281,6 +80541,7 @@
+ }
+ 
+ static void f_spill(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_spill",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -80554,6 +80815,7 @@
+ }
+ 
+ static void f_spill_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_spill_reg",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -80848,6 +81110,7 @@
+ }
+ 
+ static void f_get_one_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_get_one_reg",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -81073,6 +81336,7 @@
+ }
+ 
+ static void f_get_two_regs(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_get_two_regs",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -81136,6 +81400,7 @@
+ }
+ 
+ static void f_get_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_get_reg",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -81209,6 +81474,7 @@
+ }
+ 
+ static void f_get_reg1(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_get_reg1",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -81453,6 +81719,7 @@
+ }
+ 
+ static void f_get_fp_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_get_fp_reg",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -81681,6 +81948,7 @@
+ }
+ 
+ static void f_get_fp_reg1(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_get_fp_reg1",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -81768,6 +82036,7 @@
+ }
+ 
+ static uint32_t f_can_get_two_regs(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_can_get_two_regs",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -81831,6 +82100,7 @@
+ }
+ 
+ static uint32_t f_spill_two_regs(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_spill_two_regs",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -82072,6 +82342,7 @@
+ }
+ 
+ static uint32_t f_get_two_free_regs(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_get_two_free_regs",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -82243,6 +82514,7 @@
+ }
+ 
+ static uint32_t f_get_one_free_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_get_one_free_reg",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -82432,11 +82704,13 @@
+ 
+ static uint32_t f_get_free_reg_real(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1);
+ static uint32_t f_get_free_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_get_free_reg",2,a0,a1,0,0);
+ uint32_t r = f_get_free_reg_real(mem, sp, a0, a1);
+ if(fl_trace_on())fprintf(stderr,"GET -> %u\n", r & 0xff);
+ return r;
+ }
+ static uint32_t f_get_free_reg_real(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_get_free_reg_real",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -82510,6 +82784,7 @@
+ }
+ 
+ static uint32_t f_get_free_fp_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_get_free_fp_reg",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -82680,6 +82955,7 @@
+ }
+ 
+ static uint32_t f_content_of(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_content_of",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -82831,6 +83107,7 @@
+ }
+ 
+ static void f_inc_usage(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_inc_usage",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -82863,6 +83140,7 @@
+ }
+ 
+ static void f_dec_usage(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_dec_usage",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -83151,6 +83429,7 @@
+ }
+ 
+ static void f_free_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_free_reg",1,a0,0,0,0);
+ if(fl_trace_on())fprintf(stderr,"FRE %u\n", a0 & 0xff);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+@@ -83532,6 +83811,7 @@
+ }
+ 
+ static void f_free_fp_reg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_free_fp_reg",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -83730,6 +84010,7 @@
+ }
+ 
+ static void f_force_free_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_force_free_reg",1,a0,0,0,0);
+ if(fl_trace_on())fprintf(stderr,"FFR %u\n", a0 & 0xff);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+@@ -83808,6 +84089,7 @@
+ }
+ 
+ static void f_add_to_free_list(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_add_to_free_list",1,a0,0,0,0);
+ if(fl_trace_on())fprintf(stderr,"ADD %u\n", a0 & 0xff);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+@@ -83979,6 +84261,7 @@
+ }
+ 
+ static void f_add_to_fp_free_list(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_add_to_fp_free_list",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -84149,6 +84432,7 @@
+ }
+ 
+ static void f_remove_from_free_list(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_remove_from_free_list",1,a0,0,0,0);
+ if(fl_trace_on())fprintf(stderr,"REM %u\n", a0 & 0xff);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+@@ -84487,6 +84771,7 @@
+ }
+ 
+ static void f_remove_from_fp_free_list(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_remove_from_fp_free_list",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -84662,6 +84947,7 @@
+ }
+ 
+ static uint32_t f_is_available(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_available",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -84693,6 +84979,7 @@
+ }
+ 
+ static void f_check_no_used(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_check_no_used",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -84976,6 +85263,7 @@
+ }
+ 
+ static uint32_t f_usage_count(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_usage_count",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85007,6 +85295,7 @@
+ }
+ 
+ static void f_move_to_end_fp_list(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_move_to_end_fp_list",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85060,6 +85349,7 @@
+ }
+ 
+ static void f_move_to_end_gp_list(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_move_to_end_gp_list",1,a0,0,0,0);
+ if(fl_trace_on())fprintf(stderr,"END %u\n", a0 & 0xff);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+@@ -85114,6 +85404,7 @@
+ }
+ 
+ static void f_report_error(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_report_error",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85345,6 +85636,7 @@
+ }
+ 
+ static uint32_t f_has_errors(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_has_errors",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85414,6 +85706,7 @@
+ }
+ 
+ static uint32_t f_sym_hash(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_sym_hash",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85435,6 +85728,7 @@
+ }
+ 
+ static uint32_t f_get_data_area(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_get_data_area",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85627,6 +85921,7 @@
+ }
+ 
+ static uint32_t f_get_sym_type(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_get_sym_type",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85736,6 +86031,7 @@
+ }
+ 
+ static uint32_t f_make_new_sym(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_make_new_sym",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85921,6 +86217,7 @@
+ }
+ 
+ static uint32_t f_change_sym_type(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_change_sym_type",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -85962,6 +86259,7 @@
+ }
+ 
+ static uint32_t f_lookup_sym(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_lookup_sym",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -86026,6 +86324,7 @@
+ }
+ 
+ static void f_clear_sym_tab(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_clear_sym_tab",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -86063,6 +86362,7 @@
+ }
+ 
+ static void f_gen_sym(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_gen_sym",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -86904,6 +87204,7 @@
+ }
+ 
+ static void f_set_size(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_set_size",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -86949,6 +87250,7 @@
+ }
+ 
+ static uint32_t f_some_init_overlap(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_some_init_overlap",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -87029,6 +87331,7 @@
+ }
+ 
+ static void f_complex_init_duplicate_p(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_complex_init_duplicate_p",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -87105,6 +87408,7 @@
+ }
+ 
+ static void f_complex_insert_init(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_complex_insert_init",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -88066,6 +88370,7 @@
+ }
+ 
+ static void f_append_init(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_append_init",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -88624,6 +88929,7 @@
+ }
+ 
+ static void f_add_init(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_add_init",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -88670,6 +88976,7 @@
+ }
+ 
+ static void f_choose_area(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_choose_area",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -88837,6 +89144,7 @@
+ }
+ 
+ static void f_force_alignment(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_force_alignment",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -88890,6 +89198,7 @@
+ }
+ 
+ static void f_emit_init(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_emit_init",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -89721,6 +90030,7 @@
+ }
+ 
+ static void f_emit_symbol(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_emit_symbol",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90139,6 +90449,7 @@
+ }
+ 
+ static void f_output_decls(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_output_decls",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90244,6 +90555,7 @@
+ }
+ 
+ static void f_output_entry_point(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_output_entry_point",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90443,6 +90755,7 @@
+ }
+ 
+ static void f_set_mtag(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_set_mtag",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90495,6 +90808,7 @@
+ }
+ 
+ static uint32_t f_get_mtag(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_get_mtag",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90544,6 +90858,7 @@
+ }
+ 
+ static uint32_t f_get_sym_kind(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_get_sym_kind",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90591,6 +90906,7 @@
+ }
+ 
+ static void f_init_temps(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_init_temps",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90620,6 +90936,7 @@
+ }
+ 
+ static uint32_t f_lookup_temp(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_lookup_temp",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90676,6 +90993,7 @@
+ }
+ 
+ static uint32_t f_make_new_temp(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_make_new_temp",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90864,6 +91182,7 @@
+ }
+ 
+ static uint32_t f_find_free_temp(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_find_free_temp",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -90921,6 +91240,7 @@
+ }
+ 
+ static void f_gen_store(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_gen_store",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -91396,6 +91716,7 @@
+ }
+ 
+ static void f_spill_to_temp(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_spill_to_temp",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -91501,6 +91822,7 @@
+ }
+ 
+ static void f_free_temp(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_free_temp",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -91652,6 +91974,7 @@
+ }
+ 
+ static uint32_t f_temp_offset(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_temp_offset",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -91809,6 +92132,7 @@
+ }
+ 
+ static uint32_t f_temp_usage_count(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_temp_usage_count",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -91966,6 +92290,7 @@
+ }
+ 
+ static uint32_t f_get_temp_area_size(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_get_temp_area_size",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -92008,6 +92333,7 @@
+ }
+ 
+ static void f_set_temps_offset(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_set_temps_offset",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -92041,6 +92367,7 @@
+ }
+ 
+ static void f_force_casting(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_force_casting",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -92132,6 +92459,7 @@
+ }
+ 
+ static uint32_t f_is_power_of_two(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_power_of_two",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -92188,6 +92516,7 @@
+ }
+ 
+ static uint32_t f_get_set_const(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_get_set_const",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -92328,6 +92657,7 @@
+ }
+ 
+ static void f_gen_set_str(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_gen_set_str",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -92484,6 +92814,7 @@
+ }
+ 
+ static void f_gen_set_istr(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_gen_set_istr",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -92647,6 +92978,7 @@
+ }
+ 
+ static uint32_t f_gen_set_equ(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_gen_set_equ",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -92824,6 +93156,7 @@
+ }
+ 
+ static uint32_t f_set_rewrite(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_set_rewrite",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -93752,6 +94085,7 @@
+ }
+ 
+ static uint32_t f_set_rewrite_indexed(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_set_rewrite_indexed",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -94631,6 +94965,7 @@
+ }
+ 
+ static uint32_t f_translate_tree(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_translate_tree",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -94694,6 +95029,7 @@
+ }
+ 
+ static uint32_t f_translate(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_translate",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -99889,6 +100225,7 @@
+ }
+ 
+ static uint32_t f_cse_equ(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_cse_equ",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -100844,6 +101181,7 @@
+ }
+ 
+ static uint32_t f_cse(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_cse",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -101088,6 +101426,7 @@
+ }
+ 
+ static uint32_t f_overlap(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_overlap",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -101153,6 +101492,7 @@
+ }
+ 
+ static void f_free_tree_and_cse(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_free_tree_and_cse",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -101458,6 +101798,7 @@
+ }
+ 
+ static uint32_t f_check_vreg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_check_vreg",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -101803,6 +102144,7 @@
+ }
+ 
+ static void f_find_vreg_mtag(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_find_vreg_mtag",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -102125,6 +102467,7 @@
+ }
+ 
+ static void f_check_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_check_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -102260,6 +102603,7 @@
+ }
+ 
+ static void f_assign_vreg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_assign_vreg",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -102896,6 +103240,7 @@
+ }
+ 
+ static uint32_t f_load_cse(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_load_cse",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -103272,6 +103617,7 @@
+ }
+ 
+ static uint32_t f_uses(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_uses",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -103783,6 +104129,7 @@
+ }
+ 
+ static void f_add_store(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_add_store",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -104085,6 +104432,7 @@
+ }
+ 
+ static uint32_t f_is_reg(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_reg",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -104140,6 +104488,7 @@
+ }
+ 
+ static uint32_t f_translate_cvtl(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_translate_cvtl",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -104638,6 +104987,7 @@
+ }
+ 
+ static uint32_t f_need_check_hl(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_need_check_hl",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -104726,6 +105076,7 @@
+ }
+ 
+ static uint32_t f_build_ucond0(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_build_ucond0",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -104797,6 +105148,7 @@
+ }
+ 
+ static uint32_t f_check_loads_exprs(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_check_loads_exprs",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -105003,6 +105355,7 @@
+ }
+ 
+ static void f_indent_tree(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_indent_tree",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -105070,6 +105423,7 @@
+ }
+ 
+ static void f_print_ucode(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_print_ucode",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -105779,6 +106133,7 @@
+ }
+ 
+ static void f_print_node_1(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_print_node_1",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106099,6 +106454,7 @@
+ }
+ 
+ static void f_print_node(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_print_node",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106287,6 +106643,7 @@
+ }
+ 
+ static void f_print_tree(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_print_tree",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106334,6 +106691,7 @@
+ }
+ 
+ static void f_initialize_tree(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_initialize_tree",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106366,6 +106724,7 @@
+ }
+ 
+ static uint32_t f_gen_label_id(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_gen_label_id",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106396,6 +106755,7 @@
+ }
+ 
+ static uint32_t f_new_tree(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_new_tree",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106499,6 +106859,7 @@
+ }
+ 
+ static uint32_t f_build_u(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_build_u",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106560,6 +106921,7 @@
+ }
+ 
+ static uint32_t f_build_u1(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_build_u1",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106624,6 +106986,7 @@
+ }
+ 
+ static uint32_t f_build_u2(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_build_u2",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106691,6 +107054,7 @@
+ }
+ 
+ static uint32_t f_build_op(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_build_op",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106729,6 +107093,7 @@
+ }
+ 
+ static uint32_t f_build_1op(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_build_1op",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -106887,6 +107252,7 @@
+ }
+ 
+ static uint32_t f_build_2op(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_build_2op",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107054,6 +107420,7 @@
+ }
+ 
+ static void f_free_node(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_free_node",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107075,6 +107442,7 @@
+ }
+ 
+ static void f_free_tree(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_free_tree",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107202,6 +107570,7 @@
+ }
+ 
+ static void f_delete_statement(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_delete_statement",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107308,6 +107677,7 @@
+ }
+ 
+ static uint32_t f_dup_tree(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_dup_tree",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107504,6 +107874,7 @@
+ }
+ 
+ static uint32_t f_next_mark(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_next_mark",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107535,6 +107906,7 @@
+ }
+ 
+ static uint32_t f_ivalue(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_ivalue",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107603,6 +107975,7 @@
+ }
+ 
+ static uint32_t f_dwvalue(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_dwvalue",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107671,6 +108044,7 @@
+ }
+ 
+ static uint32_t f_rvalue(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_rvalue",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107923,6 +108297,7 @@
+ }
+ 
+ static uint32_t f_is_zero(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_is_zero",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -107990,6 +108365,7 @@
+ }
+ 
+ static uint32_t f_result_type(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_result_type",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -108254,6 +108630,7 @@
+ }
+ 
+ static uint32_t f_const_equal(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_const_equal",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -108403,6 +108780,7 @@
+ }
+ 
+ static void f_u_tree(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_u_tree",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -110008,6 +110386,7 @@
+ }
+ 
+ static uint32_t f_main(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_main",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -114436,6 +114815,7 @@
+ }
+ 
+ static void f_emit_composite_val(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_emit_composite_val",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -114671,6 +115051,7 @@
+ }
+ 
+ static void f_emit_val(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_val",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -115121,6 +115502,7 @@
+ }
+ 
+ static void f_emit_label_val(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_emit_label_val",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -115185,6 +115567,7 @@
+ }
+ 
+ static uint32_t f_find_val_type(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_find_val_type",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -115742,6 +116125,7 @@
+ }
+ 
+ static void f_readuinstr(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_readuinstr",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -116047,6 +116431,7 @@
+ }
+ 
+ static void f_initur(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_initur",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -116136,6 +116521,7 @@
+ }
+ 
+ static void f_inituwrite(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_inituwrite",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -116219,6 +116605,7 @@
+ }
+ 
+ static uint32_t f_fnamelen(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_fnamelen",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -116296,6 +116683,7 @@
+ }
+ 
+ static void f_uwrite(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_uwrite",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -116612,6 +117000,7 @@
+ }
+ 
+ static void f_uini(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_uini",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125014,6 +125403,7 @@
+ }
+ 
+ static void f_uputinit(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_uputinit",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125121,6 +125511,7 @@
+ }
+ 
+ static void f_uputint(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_uputint",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125244,6 +125635,7 @@
+ }
+ 
+ static void f_ugetinit(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_ugetinit",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125351,6 +125743,7 @@
+ }
+ 
+ static uint32_t f_ugetint(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_ugetint",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125574,6 +125967,7 @@
+ }
+ 
+ static uint32_t f_ugeteof(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_ugeteof",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125627,6 +126021,7 @@
+ }
+ 
+ static uint32_t f_st_str_idn(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_str_idn",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125695,6 +126090,7 @@
+ }
+ 
+ static uint32_t f_st_fglobal_idn(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_st_fglobal_idn",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125771,6 +126167,7 @@
+ }
+ 
+ static uint32_t f_st_readbinary(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_readbinary",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -125840,6 +126237,7 @@
+ }
+ 
+ static uint32_t f_st_readst(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_readst",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -127541,6 +127939,7 @@
+ }
+ 
+ static void f_st_writest(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_st_writest",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -128990,6 +129389,7 @@
+ }
+ 
+ static uint32_t f_st_currentifd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_st_currentifd",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -129036,6 +129436,7 @@
+ }
+ 
+ static uint32_t f_st_ifdmax(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_st_ifdmax",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -129066,6 +129467,7 @@
+ }
+ 
+ static void f_st_setfd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_setfd",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -129124,6 +129526,7 @@
+ }
+ 
+ static void f_st_fdadd(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_st_fdadd",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -129759,6 +130162,7 @@
+ }
+ 
+ static uint32_t f_st_auxadd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_auxadd",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -129897,6 +130301,7 @@
+ }
+ 
+ static void f_st_pdadd(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_st_pdadd",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -130065,6 +130470,7 @@
+ }
+ 
+ static uint32_t f_st_stradd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_stradd",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -130234,6 +130640,7 @@
+ }
+ 
+ static uint32_t f_st_paux_ifd_iaux(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_paux_ifd_iaux",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -130338,6 +130745,7 @@
+ }
+ 
+ static uint32_t f_st_str_iss(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_str_iss",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -130427,6 +130835,7 @@
+ }
+ 
+ static uint32_t f_st_malloc(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_malloc",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -130578,6 +130987,7 @@
+ }
+ 
+ static uint32_t f_st_symadd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_symadd",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -130830,6 +131240,7 @@
+ }
+ 
+ static uint32_t f_st_ifd_pcfd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_st_ifd_pcfd",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -130902,6 +131313,7 @@
+ }
+ 
+ static uint32_t f_st_pcfd_ifd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_pcfd_ifd",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -130981,6 +131393,7 @@
+ }
+ 
+ static uint32_t f_st_psym_ifd_isym(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_psym_ifd_isym",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131107,6 +131520,7 @@
+ }
+ 
+ static uint32_t f_st_paux_iaux(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_st_paux_iaux",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131214,6 +131628,7 @@
+ }
+ 
+ static uint32_t f_st_str_ifd_iss(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_str_ifd_iss",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131309,6 +131724,7 @@
+ }
+ 
+ static void f_st_internal(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_internal",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131397,6 +131813,7 @@
+ }
+ 
+ static uint32_t f_st_pext_iext(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_pext_iext",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131456,6 +131873,7 @@
+ }
+ 
+ static uint32_t f_st_idn_index_fext(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_idn_index_fext",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131592,6 +132010,7 @@
+ }
+ 
+ static uint32_t f_st_pdn_idn(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_st_pdn_idn",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131655,6 +132074,7 @@
+ }
+ 
+ static uint32_t f_st_str_extiss(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_st_str_extiss",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131699,6 +132119,7 @@
+ }
+ 
+ static void f_st_idn_dn(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_idn_dn",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131815,6 +132236,7 @@
+ }
+ 
+ static void f_st_setidn(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_setidn",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -131893,6 +132315,7 @@
+ }
+ 
+ static uint32_t f_st_iaux_copyty(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_iaux_copyty",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -132212,6 +132635,7 @@
+ }
+ 
+ static void f_st_auxisymadd(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_st_auxisymadd",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -132249,6 +132673,7 @@
+ }
+ 
+ static void f_st_auxrndxadd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_st_auxrndxadd",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -132310,6 +132735,7 @@
+ }
+ 
+ static void f_swap_hdr(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_swap_hdr",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -132596,6 +133022,7 @@
+ }
+ 
+ static void f_swap_fd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_swap_fd",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -133019,6 +133446,7 @@
+ }
+ 
+ static void f_swap_fi(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_swap_fi",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -133127,6 +133555,7 @@
+ }
+ 
+ static void f_swap_sym(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_swap_sym",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -133324,6 +133753,7 @@
+ }
+ 
+ static void f_swap_ext(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_swap_ext",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -133616,6 +134046,7 @@
+ }
+ 
+ static void f_swap_pd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_swap_pd",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -133794,6 +134225,7 @@
+ }
+ 
+ static void f_swap_dn(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_swap_dn",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -133905,6 +134337,7 @@
+ }
+ 
+ static void f_swap_opt(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_swap_opt",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134100,6 +134533,7 @@
+ }
+ 
+ static uint32_t f_gethostsex(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_gethostsex",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134136,6 +134570,7 @@
+ }
+ 
+ static void f_st_error(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_st_error",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134225,6 +134660,7 @@
+ }
+ 
+ static uint32_t f_ldfsymorder(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_ldfsymorder",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134617,6 +135053,7 @@
+ }
+ 
+ static void f_st_warning(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_st_warning",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134716,6 +135153,7 @@
+ }
+ 
+ static void f__md_st_internal(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f__md_st_internal",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134804,6 +135242,7 @@
+ }
+ 
+ static void f__md_st_error(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f__md_st_error",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134895,6 +135334,7 @@
+ }
+ 
+ static uint32_t f__md_st_str_extiss(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f__md_st_str_extiss",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134939,6 +135379,7 @@
+ }
+ 
+ static uint32_t f__md_st_currentifd(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f__md_st_currentifd",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -134985,6 +135426,7 @@
+ }
+ 
+ static uint32_t f__md_st_malloc(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f__md_st_malloc",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -135135,6 +135577,7 @@
+ }
+ 
+ static void f_exit(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_exit",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -135278,6 +135721,7 @@
+ }
+ 
+ static void f_get(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_get",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -135389,6 +135833,7 @@
+ }
+ 
+ static uint32_t f_eof(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_eof",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -135472,6 +135917,7 @@
+ }
+ 
+ static uint32_t f_eoln(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_eoln",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -135566,6 +136012,7 @@
+ }
+ 
+ static uint32_t f_peek_char(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_peek_char",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -135657,6 +136104,7 @@
+ }
+ 
+ static void f_next_char(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_next_char",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -135734,6 +136182,7 @@
+ }
+ 
+ static uint32_t f_calc_size(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_calc_size",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -135779,6 +136228,7 @@
+ }
+ 
+ static void f_reset(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_reset",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -136377,6 +136827,7 @@
+ }
+ 
+ static void f_writeln(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_writeln",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -136475,6 +136926,7 @@
+ }
+ 
+ static void f_write_char(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_write_char",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -136691,6 +137143,7 @@
+ }
+ 
+ static void f_write_string(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_write_string",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -136786,6 +137239,7 @@
+ }
+ 
+ static void f_write_enum(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_write_enum",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -136909,6 +137363,7 @@
+ }
+ 
+ static void f_write_integer(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_write_integer",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137051,6 +137506,7 @@
+ }
+ 
+ static void f_write_cardinal(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_write_cardinal",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137177,6 +137633,7 @@
+ }
+ 
+ static void f_write_int64(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_write_int64",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137392,6 +137849,7 @@
+ }
+ 
+ static void f_caseerror(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_caseerror",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137459,6 +137917,7 @@
+ }
+ 
+ static uint32_t f_new(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_new",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137515,6 +137974,7 @@
+ }
+ 
+ static void f_dispose(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_dispose",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137549,6 +138009,7 @@
+ }
+ 
+ static void f_rewrite(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
++CT_FRAME("f_rewrite",4,a0,a1,a2,a3);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137792,6 +138253,7 @@
+ }
+ 
+ static void f_get_arg(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1, uint32_t a2) {
++CT_FRAME("f_get_arg",3,a0,a1,a2,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137883,6 +138345,7 @@
+ }
+ 
+ static void f__getbuf(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f__getbuf",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137956,6 +138419,7 @@
+ }
+ 
+ static void f_xfree(uint8_t *mem, uint32_t sp) {
++CT_FRAME("f_xfree",0,0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -137984,6 +138448,7 @@
+ }
+ 
+ static void f_alloc_dispose(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_alloc_dispose",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -138279,6 +138744,7 @@
+ }
+ 
+ static uint32_t f_xmalloc(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_xmalloc",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -138308,6 +138774,7 @@
+ }
+ 
+ static uint32_t f_alloc_new(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_alloc_new",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -138458,6 +138925,7 @@
+ }
+ 
+ static uint32_t f_alloc_page(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_alloc_page",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -138543,6 +139011,7 @@
+ }
+ 
+ static void f_alloc_free(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_alloc_free",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -138578,6 +139047,7 @@
+ }
+ 
+ static void f_alloc_scb(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_alloc_scb",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -138640,6 +139110,7 @@
+ }
+ 
+ static uint32_t f_alloc_mark(uint8_t *mem, uint32_t sp, uint32_t a0) {
++CT_FRAME("f_alloc_mark",1,a0,0,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -138748,6 +139219,7 @@
+ }
+ 
+ static void f_alloc_release(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_alloc_release",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;
+@@ -138852,6 +139324,7 @@
+ }
+ 
+ static uint32_t f_alloc_next_scb(uint8_t *mem, uint32_t sp, uint32_t a0, uint32_t a1) {
++CT_FRAME("f_alloc_next_scb",2,a0,a1,0,0);
+ const uint32_t zero = 0;
+ uint32_t at = 0, v1 = 0, t0 = 0, t1 = 0, t2 = 0,
+ t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, gp = 0x10000, ra = 0x10000;

@@ -1,0 +1,5 @@
+                selectedTrack = gTrackSelectIDs[trackY][trackX];
+                temp = (temp = selectedTrack);
+                cur->hubName = levelName;
+                if (selectedTrack != (-1))
+                {

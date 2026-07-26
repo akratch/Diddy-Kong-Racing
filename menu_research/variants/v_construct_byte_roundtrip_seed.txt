@@ -1,0 +1,22 @@
+===FROM===
+            if (trackY < 0 || maxTrackY < trackY || trackX < 0 || trackX >= 6) {
+                cur->visible = 0;
+            } else {
+                cur->visible = 1;
+                levelName = level_name(level_world_id(trackY + 1));
+                temp = (temp = gTrackSelectIDs[trackY][trackX]);
+                selectedTrack = gTrackSelectIDs[trackY][trackX];
+                cur->hubName = levelName;
+                if (selectedTrack != -1) {
+===TO===
+                if (selectedTrack != -1) {
+===CODE===
+            if (trackY < 0 || maxTrackY < trackY || trackX < 0 || trackX >= 6) {
+                ((TrackRenderDetails *)((char *) gTrackSelectRenderDetails +
+                    ((char *) cur - (char *) gTrackSelectRenderDetails)))->visible = 0;
+            } else {
+                ((TrackRenderDetails *)((char *) gTrackSelectRenderDetails +
+                    ((char *) cur - (char *) gTrackSelectRenderDetails)))->visible = 1;
+                levelName = level_name(level_world_id(trackY + 1));
+                cur->hubName = levelName;
+                if (gTrackSelectIDs[trackY][trackX] != -1) {

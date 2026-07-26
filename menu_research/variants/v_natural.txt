@@ -1,0 +1,6 @@
+===FROM===
+                temp = (temp = gTrackSelectIDs[trackY][trackX]);
+===TO===
+                selectedTrack = gTrackSelectIDs[trackY][trackX];
+===CODE===
+                selectedTrack = gTrackSelectIDs[trackY][trackX];

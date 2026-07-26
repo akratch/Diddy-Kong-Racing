@@ -1,0 +1,119 @@
+===DECLS===
+    s32 i;
+    s32 row[1];
+    char *trackName;
+    char *hubName;
+    s32 selectedTrack;
+    s32 trackSelectX;
+    s32 trackSelectY;
+    char *levelName;
+    s32 maxTrackY;
+    s8 *trackMenuIds;
+    Settings *settings;
+    TrackRenderDetails *cur;
+    s32 trackX;
+    s32 trackY;
+    s32 j;
+    s32 startIndex;
+    s16 temp;
+===CODE===
+===FROM===
+    startIndex = -1;
+    for (i = startIndex, cur = gTrackSelectRenderDetails; i < 2; i++) {
+===TO===
+    camDisableUserView(0, 1);
+===CODE===
+    startIndex = -1;
+    row[0] = startIndex;
+    j = startIndex;
+    selectedTrack = 0;
+    for (;;) {
+        trackX = trackSelectX + j;
+        trackY = trackSelectY;
+        if (trackY < 0 || maxTrackY < trackY || trackX < 0 || trackX >= 6) {
+            gTrackSelectRenderDetails[selectedTrack].visible = 0;
+        } else {
+            gTrackSelectRenderDetails[selectedTrack].visible = 1;
+            levelName = level_name(level_world_id(trackY + 1));
+            gTrackSelectRenderDetails[selectedTrack].hubName = levelName;
+            if (gTrackSelectIDs[trackY][trackX] != -1) {
+                gTrackSelectRenderDetails[selectedTrack].trackName =
+                    level_name(trackMenuIds[((trackY * 6) + trackX)]);
+                if (trackX == 4) {
+                    if ((((settings->trophies) >> (trackY * 2)) & 3) == 3) {
+                        gTrackSelectRenderDetails[selectedTrack].visible = 2;
+                    }
+                } else if ((settings->courseFlagsPtr[trackMenuIds[((trackY * 6) + trackX)]] & 2)) {
+                    gTrackSelectRenderDetails[selectedTrack].visible = 2;
+                }
+            } else {
+                gTrackSelectRenderDetails[selectedTrack].trackName = gQMarkPtr;
+            }
+            gTrackSelectRenderDetails[selectedTrack].xOff = ((trackX * 320) - gTrackSelectX);
+            gTrackSelectRenderDetails[selectedTrack].yOff =
+                ((-trackY * gTrackSelectViewportY) - gTrackSelectY);
+            gTrackSelectRenderDetails[selectedTrack].opacity = 0xFF;
+            if ((trackX == gSelectedTrackX) && (trackY == gSelectedTrackY)) {
+                gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                    (gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF) | 0x80;
+                if (gOpacityDecayTimer < 32) {
+                    gTrackSelectRenderDetails[selectedTrack].opacity = gOpacityDecayTimer * 8;
+                }
+            } else {
+                gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                    gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF7F;
+            }
+            gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF80;
+            if (gMenuDelay == 0) {
+                if (trackY > 0) {
+                    gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                        (((gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF) | 1) & 0x7F) |
+                        (gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF80);
+                }
+                if (trackX < 5) {
+                    gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                        (((gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF) | 2) & 0x7F) |
+                        (gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF80);
+                }
+                if (trackY < maxTrackY) {
+                    gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                        (((gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF) | 4) & 0x7F) |
+                        (gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF80);
+                }
+                if (trackX > 0) {
+                    gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                        (((gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF) | 8) & 0x7F) |
+                        (gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF80);
+                }
+                if (trackX == 4 && trackY == 4) {
+                    gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                        ((gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF & 0xFF) & 0x7D) |
+                        (gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF80);
+                }
+                if (trackX == 5 && trackY == 3) {
+                    gTrackSelectRenderDetails[selectedTrack].copyViewPort =
+                        ((gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF & 0xFF) & 0x7B) |
+                        (gTrackSelectRenderDetails[selectedTrack].copyViewPort & 0xFF80);
+                }
+            }
+            if (trackX == 4) {
+                gTrackSelectRenderDetails[selectedTrack].border = 6;
+            } else if (trackX == 5) {
+                gTrackSelectRenderDetails[selectedTrack].border = 5;
+            } else {
+                gTrackSelectRenderDetails[selectedTrack].border = 4;
+            }
+        }
+        selectedTrack++;
+        j++;
+        if (j == 2) {
+            trackSelectY++;
+            row[0]++;
+            if (row[0] >= 2) {
+                break;
+            }
+            j = startIndex;
+        }
+    }
+    camDisableUserView(0, 1);

@@ -1,0 +1,53 @@
+===DECLS===
+    s32 i;
+    char *trackName;
+    char *hubName;
+    s32 selectedTrack;
+    s32 trackSelectX;
+    s32 trackSelectY;
+    char *levelName;
+    s32 maxTrackY;
+    s8 *trackMenuIds;
+    Settings *settings;
+    TrackRenderDetails *cur;
+    s32 trackX;
+    s32 trackY;
+    s32 j;
+    s32 startIndex;
+    s16 temp;
+    s32 k;
+===CODE===
+===FROM===
+    for (i = startIndex, cur = gTrackSelectRenderDetails; i < 2; i++) {
+        for (j = startIndex; j < 2; j++, cur++) {
+            trackX = trackSelectX + j;
+            trackY = trackSelectY;
+            if (trackY < 0 || maxTrackY < trackY || trackX < 0 || trackX >= 6) {
+                cur->visible = 0;
+            } else {
+                cur->visible = 1;
+                levelName = level_name(level_world_id(trackY + 1));
+                temp = (temp = gTrackSelectIDs[trackY][trackX]);
+                selectedTrack = gTrackSelectIDs[trackY][trackX];
+                cur->hubName = levelName;
+                if (selectedTrack != -1) {
+===TO===
+                if (selectedTrack != -1) {
+===CODE===
+    for (i = startIndex, k = 0, cur = gTrackSelectRenderDetails; i < 2; i++) {
+        for (j = startIndex; j < 2; j++, k++, cur++) {
+            trackX = trackSelectX + j;
+            trackY = trackSelectY;
+            if (trackY < 0 || maxTrackY < trackY || trackX < 0 || trackX >= 6) {
+                gTrackSelectRenderDetails[k].visible = 0;
+            } else {
+                gTrackSelectRenderDetails[k].visible = 1;
+                /*
+                 * k and cur advance in lockstep, so this assignment is
+                 * redundant.  It gives the direct-index web and the pointer
+                 * web an explicit zero-cost coalescing opportunity.
+                 */
+                cur = &gTrackSelectRenderDetails[k];
+                levelName = level_name(level_world_id(trackY + 1));
+                cur->hubName = levelName;
+                if (gTrackSelectIDs[trackY][trackX] != -1) {

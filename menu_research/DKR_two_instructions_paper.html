@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Last Two Instructions</title>
+<style>
+  @page { size: A4; margin: 22mm 20mm; }
+  body { font-family: "Charter", "Georgia", serif; font-size: 10.5pt; line-height: 1.45;
+         color: #1a1a1a; max-width: 172mm; margin: 0 auto; }
+  h1 { font-size: 19pt; line-height: 1.2; margin: 0 0 4pt 0; }
+  .subtitle { font-size: 12pt; color: #444; margin-bottom: 2pt; }
+  .meta { font-size: 9pt; color: #666; margin-bottom: 18pt; }
+  h2 { font-size: 13pt; margin: 18pt 0 6pt 0; border-bottom: 1px solid #999; padding-bottom: 2pt; }
+  h3 { font-size: 11pt; margin: 12pt 0 4pt 0; }
+  p { margin: 5pt 0; text-align: justify; }
+  code, pre { font-family: "SF Mono", "Menlo", monospace; font-size: 8.6pt; }
+  pre { background: #f5f5f2; border: 1px solid #ddd; padding: 6pt 8pt; overflow-x: auto;
+        page-break-inside: avoid; }
+  table { border-collapse: collapse; margin: 8pt 0; font-size: 9pt; width: 100%;
+          page-break-inside: avoid; }
+  th, td { border: 1px solid #bbb; padding: 3pt 6pt; text-align: left; vertical-align: top; }
+  th { background: #eee; }
+  .abstract { font-size: 9.8pt; margin: 10pt 24pt 14pt 24pt; }
+  .abstract b { font-variant: small-caps; }
+  .box { background: #f2f4f7; border-left: 3px solid #567; padding: 6pt 10pt; margin: 8pt 0;
+         page-break-inside: avoid; }
+  li { margin: 3pt 0; }
+  .footnote { font-size: 8.5pt; color: #555; }
+  a { color: #235; }
+</style>
+</head>
+<body>
+
+<h1>The Last Two Instructions</h1>
+<div class="subtitle">A forensic analysis of an unmatched function in the
+<i>Diddy&nbsp;Kong Racing</i> decompilation, and what it reveals about the IDO&nbsp;5.3 code generator</div>
+<div class="meta">Diddy Kong Racing decompilation project &mdash; research report, July 2026.
+Revised after the final construction session. Artifact archive:
+<code>menu_research/</code> in the project repository.</div>
+
+<div class="abstract">
+<p><b>Abstract.</b> The matching decompilation of <i>Diddy Kong Racing</i> (Rare, 1997)
+reproduces the retail ROM byte-for-byte except for a small number of functions. The hardest of
+these, the track-selection routine <code>func_8008FF1C</code> (menu.c), differs from the shipped
+binary by exactly two instructions &mdash; a single register name (<code>v1</code> vs.
+<code>t2</code>) in a load and its consuming branch. We report a multi-campaign investigation that
+(1)&nbsp;reverse-engineered the register-allocation machinery of the IDO&nbsp;5.3 code generator
+(<code>ugen</code>) to a predictive, trace-verified model; (2)&nbsp;demonstrated with a patched
+compiler that plausible plain C produces the shipped bytes exactly if one internal
+code-generation decision is flipped; (3)&nbsp;bounded the source search along seven swept
+dimensions, including a finite enumeration of the code generator's expression dispatch for the
+target-compatible holder frame;
+(4)&nbsp;falsified every obtainable alternative toolchain, including the pressed retail IDO&nbsp;5.3
+CD and SGI's own freeware re-release, which we show to be byte-identical to the community
+toolchain for every compiler pass; (5)&nbsp;established by corpus statistics over another Rare
+title built with the byte-identical compiler that the anomalous pattern occurs nowhere else in
+Rare's shipped output, while its "collapsed" counterpart occurs routinely, including in a matched
+function with the identical source topology; and (6)&nbsp;showed by cross-revision analysis of all
+five retail ROM variants that the anomaly is bit-stable across the game's entire release history,
+surviving at least one genuine recompilation. The surviving explanations reduce to two: a
+persistent, undistributed toolchain difference confined to the development machine that built this
+game, or a deterministic source construct outside every family enumerated here. We assess the
+combined residual probability of a conventionally recoverable source-level match at under two
+percent, publish the complete negative-result ledger (&sim;600 scored source variants, twelve
+toolchain combinations, seven binary lineages), and derive several results of general use to
+matching-decompilation projects.</p>
+</div>
+
+<h2>1. Background</h2>
+<p>A <i>matching decompilation</i> reconstructs C source that, compiled with the original
+toolchain and settings, reproduces a shipped binary exactly. <i>Diddy Kong Racing</i> was built
+with SGI's IDO 5.3 compiler suite, a four-pass pipeline: <code>cfe</code> (C front end &rarr;
+ucode IR), <code>uopt</code> (global optimizer and register allocator for named variables),
+<code>ugen</code> (code generator, which invents all scratch registers), and <code>as1</code>
+(assembler: delay-slot filling, copy elimination). Matching therefore requires reproducing not
+just semantics but every bookkeeping choice of this pipeline.</p>
+<p>The function at issue renders the track-selection menu. The project's best reconstruction
+compiles to 371 instructions of which 369 match the retail ROM bit-for-bit. The remaining two:</p>
+<pre>reconstruction:   lh   v1,0(s1)     ...     beq  v1,at,&lt;else&gt;
+retail ROM:       lh   t2,0(s1)     ...     beq  t2,at,&lt;else&gt;</pre>
+<p>The site reads a 16-bit track identifier from a global array, stores an unrelated pointer, and
+branches on a comparison with &minus;1; in the ROM, the store sits in the branch delay slot.
+The community had independently reached the same two-instruction residual
+(decomp.me scratch <code>L6qKV</code>, 99.69%), so this wall predates our work.</p>
+
+<h2>2. Methods</h2>
+<p><b>Scoring.</b> Candidates are compiled as the full menu.c translation unit with the project's
+canonical toolchain and compared against the reference object. Two metrics are used: a
+mnemonic+register comparison for search guidance, and a strict full-instruction-word comparison
+with relocation fields masked (verifier <code>tools/tryfw.py</code>), required to be zero &mdash;
+together with the project's whole-ROM build verification &mdash; for any match claim. The
+distinction matters: the loose metric under-counted by one relocation-affected word in early
+work, a defect found and fixed during independent audit (&sect;10).</p>
+<p><b>Glass-box instrumentation.</b> We used the community's static recompilation of the IDO
+binaries (decompals/ido-static-recomp), which translates the original IRIX MIPS executables
+instruction-for-instruction into native code with all 542 <code>ugen</code> procedures named. We
+added environment-gated logging and behavioral patches; in every case the modified binary was
+verified to produce byte-identical output with the gates disabled before any measurement was
+trusted. Pre-assembly listings (<code>cc -K</code>) and ucode listings
+(<code>-Wo,-l&hellip;</code>) provided intermediate-stage evidence.</p>
+<p><b>Search campaigns.</b> Approximately 600 source variants were constructed and scored across
+all campaigns (including &sim;58,000 iterations of the community's decomp-permuter in earlier
+sessions), organized into named families with a machine-readable ledger. Two independent audits
+reviewed the claims; both audits' corrections are incorporated and disclosed (&sect;10).</p>
+
+<h2>3. A predictive model of the IDO 5.3 code generator's scratch allocation</h2>
+<p>The following model was read from the recompiled <code>ugen</code> source, confirmed by
+event tracing (267/267 allocation events in the final validation), and verified predictively.
+To our knowledge none of it was previously documented.</p>
+<ol>
+<li><b>FIFO free-queue.</b> Expression temporaries come from a queue over the MIPS t-registers
+{$8&ndash;$15, $24, $25}, seeded [14,15,24,25,8,9,10,11,12,13]. Allocation
+(<code>get_free_reg</code>) pops the head; a value's death re-appends its register to the tail.
+Register choice for scratch values is therefore a deterministic function of allocation history,
+not liveness alone.</li>
+<li><b>Pair cycle.</b> 64-bit values take even-aligned register pairs from a monotonic cycle
+(12,13)&rarr;(14,15)&rarr;(24,25)&rarr;(8,9)&rarr;(10,11); an alignment skip re-queues the skipped
+odd register.</li>
+<li><b>64-bit low-word additions</b> receive their destination from the free-queue like any
+temporary; an apparent &ldquo;in-place&rdquo; update arises when the operand's register has just
+been freed to the queue head &mdash; an emergent effect, confirmed at the dispatch site
+(hint&nbsp;=&nbsp;none &rarr; <code>get_free_reg</code>).</li>
+<li><b>The load&ndash;store collapse.</b> When a statement stores a leaf memory load into a
+register-resident variable, the statement handler passes the variable's register down as a
+destination hint and the load lands in it directly &mdash; no queue pop occurs. This single
+decision separates the reconstruction from the ROM.</li>
+<li><b>Dead-code interplay.</b> The optimizer deletes register-only dead statements before the
+code generator runs; dead <i>memory reads</i> survive to code generation (expression-table read
+protection), where they can consume queue slots before the assembler deletes them. The
+project's long-standing &ldquo;load-bearing dead statement&rdquo;
+(<code>temp&nbsp;=&nbsp;(temp&nbsp;=&nbsp;load)</code> with <code>temp</code> declared
+<code>s16</code>) works exactly this way: it burns one queue slot ($10) and emits nothing.</li>
+<li><b>The fixed point.</b> Given one premise &mdash; that the branch-feeding load is a queue pop
+($10) &mdash; the queue model reproduces every scratch register in the second half of the
+function mechanically. The ROM's register pattern <i>is</i> the queue's fixed point.</li>
+</ol>
+
+<h2>4. Sufficiency: one compiler bit away from the natural source</h2>
+<p>We patched the recompiled <code>ugen</code> (environment-gated; byte-identical when disabled)
+to drop the destination hint for this site's exact signature. Under that one-bit change, the
+plain, trick-free source</p>
+<pre>selectedTrack = gTrackSelectIDs[trackY][trackX];
+cur-&gt;hubName  = levelName;
+if (selectedTrack != -1) { ... }</pre>
+<p>compiles to the shipped 371 instructions <b>exactly</b> (the same source scores 133
+instruction differences under the stock compiler). The intermediate listing shows the predicted
+emission verbatim: <code>lh $10; move $3,$10</code> (assembler-dissolved); the store; the branch
+&mdash; and the queue fixed point then produces the entire downstream register pattern. This
+establishes <i>sufficiency</i>: this plausible plain source produces the shipped bytes under one
+changed code-generation decision. It does not establish uniqueness or historical provenance, a
+distinction the audits insisted on and we adopt.</p>
+
+<h2>5. Bounding the C source space</h2>
+<p>Could any C construct make the <i>stock</i> compiler defer the collapse at zero cost? Seven
+dimensions were audited, each by sweep or by reading the deciding code rather than by spelling
+permutation alone:</p>
+<table>
+<tr><th>Dimension</th><th>Method</th><th>Outcome</th></tr>
+<tr><td>RHS wrapper space (every ucode operator that can wrap the load inside the store
+statement)</td><td>Finite enumeration of the code generator's 152-opcode expression dispatch +
+empirical probes</td><td>Exactly one zero-cost deferring shape exists (an identity integer
+conversion) and the front end provably deletes it before code generation (byte-identical-object
+proof). Every surviving conversion costs a register pair, live shifts, or FPU traffic; every
+other operator either collapses or emits real code.</td></tr>
+<tr><td>The &ldquo;in-place add&rdquo; residual of the community's 64-bit-mask idiom</td>
+<td>Reading the destination-selection dispatch</td><td>The needs of the three sub-goals
+(pool-temp load; aligned downstream block; fresh add destination) are pairwise satisfiable but
+jointly contradictory through one queue state.</td></tr>
+<tr><td>Register-web recoloring (forcing the holder to t2 in the optimizer)</td>
+<td>Reading the coloring code + stacking experiments</td><td>A register is forbidden only by a
+<i>surviving</i> interfering live range; all zero-code levers are invisible to coloring (stacking
+1&ndash;6 dead-statement burners leaves the color invariant), and real interference emits code
+(394 diffs observed).</td></tr>
+<tr><td>Scope, lifetime, declaration order, dead-variable reuse</td><td>Sweep (~48 cells)</td>
+<td>All collapse to v1. Declaration reordering is provably allocation-neutral.</td></tr>
+<tr><td>Control-flow topology (switch, goto diamonds, store commoning, inversions,
+short-circuit forms)</td><td>Sweep</td><td>All negative; label-bearing forms perturb allocation
+globally.</td></tr>
+<tr><td>Loop induction structure</td><td>Ten-form matrix</td><td>See &sect;5.1 &mdash; partial
+success with a decisive incompatibility.</td></tr>
+<tr><td>Aggregates, bitfields, external-declaration and prototype forms</td><td>Sweep (18+
+forms)</td><td>Every form preserving the exact signed load still collapses; every
+collapse-dodging form costs stack traffic or allocation rotation.</td></tr>
+</table>
+
+<h3>5.1 The loop-induction discovery</h3>
+<p>The raw-condition form (branching on the array element directly) always produced the correct
+pool-temp load but emitted the pointer store <i>before</i> the load, because the optimizer could
+not prove the load and the store disjoint: the store goes through a loop-carried pointer whose
+symbol provenance is destroyed by strength reduction. We found that two loop topologies &mdash;
+fully direct indexing, and an explicit linear index <code>arr[k]</code> &mdash; cause the
+optimizer to retain the symbol at the point of use, emit a load/store disjointness directive
+(<code>.noalias</code>), and produce the <b>exact target microstructure</b> (load; compare;
+branch; store in the delay slot) under the completely stock toolchain &mdash; the first C-level
+reproduction of the shipped instruction order. The incompatibility: provenance retention
+requires a surviving symbolic index (&sim;7 extra instructions), while the ROM uses a bare
+pointer induction, whose provenance the optimizer erases. The shipped compiler granted
+disjointness <i>for the bare pointer induction</i>; the canonical toolchain categorically does
+not. This yields a second single-decision route to the target, in the optimizer's alias
+analysis rather than the code generator's collapse.</p>
+
+<h2>6. Falsifying the alternative-toolchain hypotheses</h2>
+<p><b>Uniform behavioral variants are ROM-inconsistent.</b> Under any code generator whose rule
+defers collapse for a class of sites containing ours, a direct load-into-web-register is
+unproducible <i>from any source</i> at sites in that class (deferral emits a pool load, and the
+assembler renames toward pool registers, never into web registers). The matched portion of
+menu.c alone contains 67 such sites (20 with the exact narrowest signature). No uniform variant
+of the collapse rule is consistent with the shipped ROM, independent of source assumptions.</p>
+<p><b>Every obtainable binary is the same binary.</b> An exhaustive hunt across seven IDO/MIPSpro
+lineages on multiple archives established: the IDO 5.3 <code>ugen</code> is a <i>single build</i>
+(md5 <code>9fcff937&hellip;</code>) &mdash; identical across the community toolchain, the pressed
+retail &ldquo;IRIS Development Option 5.3&rdquo; CD (obtained and extracted twice,
+independently), and SGI's September 1997 freeware re-release; SGI's complete 5.3 patch record
+(398 patch manifests across both patch CDs) contains <b>no ugen patch whatsoever</b>; IDO
+5.1/5.2 produce byte-identical output at this site, and IDO 6.0/7.1/7.4.4 collapse <i>more</i>
+aggressively while breaking 52 currently-matched functions. A twelve-cell Cartesian matrix over
+{cfe, uopt, as1} &times; {retail, patch builds} left the function byte-invariant in every cell,
+and collateral damage across the matrix <b>pins the game's actual toolchain</b>: retail cfe,
+retail 5.3MR uopt, and the community-circulated as1 build.</p>
+
+<h2>7. Statistical evidence from another Rare title</h2>
+<p><i>GoldenEye 007</i> is a complete matched IDO 5.3 Rare decompilation whose repository vendors
+the <b>original IRIX ugen binary &mdash; byte-identical to ours</b>. Across its 345 code
+objects:</p>
+<ul>
+<li>The anomalous pattern (signed halfword load into a pool temporary, surviving an unrelated
+store, feeding a compare-with-&minus;1) occurs <b>zero</b> times.</li>
+<li>Corpus-wide, of the 186 temporary registers feeding a &minus;1 comparison anywhere in the
+game, <b>none</b> is produced by a signed halfword load.</li>
+<li>The <i>collapsed</i> counterpart occurs 26 times &mdash; including one matched C function
+with the identical source topology to our site (16-bit structure field into a local; intervening
+stores; compare with &minus;1) which ships collapsed, exactly as the canonical compiler behaves.
+Adapting its topology into our function reproduces our 133-difference collapse basin, as the
+model predicts.</li>
+</ul>
+<p>An audit of Banjo-Kazooie's fully matched source (712 files) found no site with the relevant
+structure at all. On present evidence the DKR site is a <b>singleton across all measurable Rare
+output</b>: one occurrence of a pattern the same compiler binary demonstrably resolves the other
+way everywhere else, including in Rare's own matched code.</p>
+
+<h2>8. Cross-revision determinism</h2>
+<p>All five retail variants were screened with a calibrated byte-pattern search (one hit, zero
+false positives on the reference ROM):</p>
+<table>
+<tr><th>ROM</th><th>Site form</th><th>Function vs. US Rev 1</th></tr>
+<tr><td>USA v1.0</td><td>lh t2 (anomalous)</td><td>identical modulo relink (35 address-class
+diffs, 0 structural)</td></tr>
+<tr><td>USA Rev 1</td><td>lh t2</td><td>reference</td></tr>
+<tr><td>Europe v1.0</td><td>lh t2</td><td>identical modulo relink (35 / 0)</td></tr>
+<tr><td>Europe Rev 1</td><td>lh t2</td><td>identical modulo relink (27 / 0)</td></tr>
+<tr><td>Japan</td><td>lh t2</td><td>identical modulo relink (50 / 0)</td></tr>
+</table>
+<p>The function is bit-stable across the game's entire release history: every difference in
+every revision is a link-address artifact (jump targets and high/low address immediates); no
+register, opcode, or structural difference exists anywhere in its 371 instructions. Crucially,
+in the Japanese build, structurally changed code sits within &sim;1&nbsp;KB of the function
+&mdash; inside its own translation unit's territory &mdash; so menu.c was genuinely recompiled
+for that release <i>and reproduced the anomaly exactly</i>. This falsifies the one-off
+build-accident hypothesis: whatever produced these two instructions was deterministic and
+persistent in the game's build environment for over a year.</p>
+
+<h2>9. Synthesis: what can still be true</h2>
+<p>The evidence now excludes: (i)&nbsp;every enumerated C source family under the canonical
+toolchain (&sect;5); (ii)&nbsp;every uniform behavioral variant of the code generator
+(&sect;6); (iii)&nbsp;every binary obtainable from public distribution, including the pressed
+retail media (&sect;6); (iv)&nbsp;a one-off build accident (&sect;8); and (v)&nbsp;any
+systematic Rare-wide toolchain difference (&sect;7). Two explanations survive, both consistent
+with all observations:</p>
+<div class="box">
+<p><b>H1 (favored): a persistent, undistributed toolchain difference on the DKR build machine.</b>
+For example, an SGI support hot-fix or locally modified compiler pass installed on the machine
+that built this game &mdash; but not on the machines that built GoldenEye or Banjo-Kazooie
+&mdash; for the project's lifetime. Two concrete one-decision mechanisms would each produce the
+bytes from natural source: the code generator's collapse hint (&sect;4) or the optimizer's alias
+tag for pointer inductions (&sect;5.1). Nothing in public circulation can test this; Rare or
+Nintendo archival material could.</p>
+<p><b>H2: a deterministic C construct outside every family enumerated here.</b> The audits
+correctly note that family enumeration cannot cover all of C; the code-generator dispatch
+enumeration is complete for one statement frame, and the topology dimensions are swept rather
+than proven. We estimate the residual at under one to two percent, informed by a same-project
+precedent in which a comparably confident impossibility verdict was later overturned by an
+untried source topology (see &sect;10).</p>
+</div>
+<p>A weakened object-reuse variant of H1 (a compiled object carried across builds) is consistent
+with the US/EU relink-only diffs but is disfavored by the Japanese recompilation evidence.</p>
+
+<h2>10. Error correction and audit history</h2>
+<p>In the spirit of adversarial collaboration we disclose the claims that did not survive:</p>
+<ul>
+<li>An early claim that the dispatch enumeration &ldquo;covers all of C by construction&rdquo;
+was an overreach; it is a lemma for one statement frame. Corrected after independent audit.</li>
+<li>An early blanket claim that no C respelling restores store provenance was true only under a
+fixed loop structure; whole-loop restructures do restore it (&sect;5.1). Corrected by sweep.</li>
+<li>The guidance metric ignored relocation-field differences; conclusions survived a strict
+re-check, and the strict verifier is now the required gate.</li>
+<li>A sister-function campaign in this same project (the racer physics routine) had earlier been
+declared &ldquo;unmatchable for any source&rdquo; on a cost-model argument; it was subsequently
+solved by an untried source topology. That precedent sets the humility bar for &sect;9's
+probability estimates, and motivated the dispatch-level (rather than family-level) closures used
+here.</li>
+</ul>
+
+<h2>11. Results of general use to decompilation projects</h2>
+<ul>
+<li><b>The ugen scratch-allocation model</b> (&sect;3): FIFO free-queue, pair cycle, collapse
+rule, and dead-code interplay apply to every IDO 5.3 title (Nintendo 64 era, including all Rare
+decompilations). The &ldquo;load-bearing dead statement&rdquo; folklore is now mechanistically
+explained.</li>
+<li><b>The glass-box method</b>: environment-gated instrumentation and behavioral patching of
+statically recompiled compiler binaries, with byte-fidelity gates. Any &ldquo;why did the
+compiler pick this register&rdquo; question is now directly observable.</li>
+<li><b>Toolchain archaeology</b>: the pressed IDO 5.3 CD, SGI's freeware tardist, and the
+community binaries are pass-for-pass byte-identical for the compiler proper; no SGI 5.3 patch
+ever shipped a ugen; three distinct 5.3 as1 builds circulate (pressed/freeware, community, and
+patchSG0001118); a working IDO 5.1 ugen recompilation is provided (relocated-libc fix).</li>
+<li><b>The ROM-anchored falsification pattern</b>: testing a hypothesized compiler variant
+source-independently by exhibiting sites in <i>matched</i> code that the variant could not
+produce from any source. Stronger than collateral counting, and cheap.</li>
+<li><b>A strict, relocation-aware verifier</b> for match claims, and the demonstration that
+mnemonic-register metrics can under-count.</li>
+</ul>
+
+<h2>12. Reproducibility</h2>
+<p>The project repository's <code>menu_research/</code> archive contains: the scoring harness and
+strict verifier; 264 durable source variants plus generated construction scripts representing
+more than 48,000 overlapping late-stage cases; a machine-readable score ledger; the compiler
+instrumentation patch (with pristine-source diff); free-queue event traces; and the individual
+campaign reports with the commands, hashes, and labels needed to re-derive each claim. All
+compiler modifications are environment-gated and byte-fidelity-verified off. The five retail
+ROM analyses require legally owned dumps; we publish offsets, patterns, and hashes only.</p>
+
+<h2>13. Construction-session addendum</h2>
+<p>A skeptical follow-up session attacked the three places where this paper's original closure
+language was soft. First, it enumerated the missing retained-direct predecessors: address-only
+seeds, direct pointer-difference round trips, and a real direct store followed by an equal
+pointer assignment. None transfers no-alias state without target-visible address work. A flat
+continuous direct induction does reach the exact local target window, correcting the earlier
+overbroad claim that direct access always costs seven extra instructions, but flattening changes
+the retail nested-loop induction and register-allocation graph.</p>
+<p>Second, the follow-up separated the real 32-bit index from semantically live 64-bit pair
+activity across producer, call-boundary, carrier, entry-pointer, and
+shift/subtract/shift-stage families. The strongest new state is 371 instructions with three
+differences at indices 106, 107, and 109; no family reached zero. Third, boundary tests for the
+non-alias producer confirmed that <code>const</code>, block scope, and parameter reuse remain
+ordinary collapsed-holder forms. Alias pragmas, <code>restrict</code>, hidden driver flags, and
+global <code>static</code> linkage also fail to alter the decision.</p>
+<div class="box"><b>Corrected standing.</b> The two-difference result is a strongly audited
+mechanism-level stopping point, not a theorem over every possible C program. Further broad
+syntax, mask, declaration-order, and loop-form sweeps revisit characterized compiler states.
+The source investigation should reopen only for a proposal that predicts a new normalized
+optimizer/code-generator state while preserving all 371 words, or for new historical build
+evidence. Exact scope and scores are in <code>report_construction_endgame.md</code> and
+<code>POSTMORTEM.md</code>.</div>
+
+<h2>14. Conclusion</h2>
+<p>Two instructions separate the <i>Diddy Kong Racing</i> decompilation from a perfect menu.c.
+They are no longer locally mysterious: two internal compiler decisions are independently
+sufficient to produce the shipped window, and the stock compiler's principal source routes are
+mechanistically characterized. Those oracle interventions do not identify the historical source
+or compiler. Short of a genuinely new normalized source topology or Rare's own build environment
+surfacing, the reconstruction at two instructions &mdash; with this dossier attached &mdash; is
+the correct and honest practical stopping point. The investigation itself has returned a
+compiler-internals dividend worth more to the community than the two register fields it set out
+to recover.</p>
+
+
+<h2>15. Postscript: the whole-ROM diagnostic demonstration</h2>
+<p>After this document was first assembled, a final experiment closed the loop at the
+strongest possible standard. The alias decision was localized to the optimizer's
+base-disjointness query (<code>f_base_noalias</code>), and the anomalous site's query was
+found to carry a descriptor signature that is a <b>singleton in descriptor space</b> across
+the entire ROM: no principled category predicate (kind-based, symbol-class, provenance)
+covers it without collateral, but the conjunction of two site-specific descriptor fields
+fires for exactly one query in the whole game. Under an environment-gated optimizer
+carrying that single grant, <b>the complete retail US&nbsp;v80 ROM was rebuilt
+byte-for-byte from the plain, natural C source for the anomalous function</b> (SHA-1 equal
+to retail; the project's full verification passing), with the gate disabled reproducing
+the stock toolchain exactly at whole-ROM scale. Sister-title forensics on two further
+Rare games supplied by legally-owned dumps (Jet Force Gemini, Mickey's Speedway USA
+&mdash; both fingerprinted as IDO 5.3-class output) found zero additional instances,
+extending the singleton to four games; and a memory-state sensitivity sweep of the
+recompiled code generator (13 poison patterns over heap and stack) proved the decision
+memory-independent, resolving the recompilation project's own &ldquo;UB stack reads&rdquo;
+annotation as an unrelated register-liveness artifact.</p>
+<p>The diagnostic state of the mystery is therefore: plausible plain source
+plus exactly one target-derived alias grant can reproduce the shipped ROM
+&mdash; demonstrable, reproducible, and bit-exactly reenacted &mdash; while the
+committed reconstruction under the strictly stock toolchain remains at two instructions.
+The gated build is an oracle, not an acceptable stock-toolchain match and not evidence that the
+historical development machine carried that exact site-keyed rule. Both states are published
+with this dossier because they separate sufficiency from historical attribution.</p>
+
+<p class="footnote">External references: decompals/ido-static-recomp (static recompilation of
+IDO); n64decomp/ido (uopt decompilation); the n64decomp GoldenEye and Banjo-Kazooie projects;
+decomp.me scratch L6qKV; jrra.zone SGI CD archive; the SGI freeware mirror at ftp.zx.net.nz.
+This document describes clean-room compiler forensics; no leaked or proprietary material was
+used.</p>
+
+</body>
+</html>

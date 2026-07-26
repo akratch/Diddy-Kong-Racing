@@ -1,0 +1,36 @@
+===FROM===
+    for (i = startIndex, cur = gTrackSelectRenderDetails; i < 2; i++) {
+        for (j = startIndex; j < 2; j++, cur++) {
+            trackX = trackSelectX + j;
+            trackY = trackSelectY;
+            if (trackY < 0 || maxTrackY < trackY || trackX < 0 || trackX >= 6) {
+                cur->visible = 0;
+            } else {
+                cur->visible = 1;
+                levelName = level_name(level_world_id(trackY + 1));
+                temp = (temp = gTrackSelectIDs[trackY][trackX]);
+                selectedTrack = gTrackSelectIDs[trackY][trackX];
+                cur->hubName = levelName;
+                if (selectedTrack != -1) {
+===TO===
+                if (selectedTrack != -1) {
+===CODE===
+    cur = gTrackSelectRenderDetails;
+    for (i = startIndex; i < 2; i++) {
+        /*
+         * This assignment is true on every outer iteration because the inner
+         * loop advances cur exactly three elements.  Its direct global-array
+         * expression is intended to seed provenance, while value-numbering
+         * can in principle eliminate the redundant pointer update.
+         */
+        cur = &gTrackSelectRenderDetails[(i - startIndex) * 3];
+        for (j = startIndex; j < 2; j++, cur++) {
+            trackX = trackSelectX + j;
+            trackY = trackSelectY;
+            if (trackY < 0 || maxTrackY < trackY || trackX < 0 || trackX >= 6) {
+                cur->visible = 0;
+            } else {
+                cur->visible = 1;
+                levelName = level_name(level_world_id(trackY + 1));
+                cur->hubName = levelName;
+                if (gTrackSelectIDs[trackY][trackX] != -1) {

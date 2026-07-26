@@ -1,0 +1,2 @@
+                if ((selectedTrack = gTrackSelectIDs[trackY][trackX], cur->hubName = levelName, selectedTrack != -1))
+                {

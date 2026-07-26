@@ -1,0 +1,22 @@
+===FROM===
+                levelName = level_name(level_world_id(trackY + 1));
+===TO===
+                    cur->trackName = gQMarkPtr;
+                }
+===CODE===
+                levelName = level_name(level_world_id(trackY + 1));
+                temp = (temp = gTrackSelectIDs[trackY][trackX]);
+                selectedTrack = gTrackSelectIDs[trackY][trackX];
+                cur->hubName = levelName;
+                if (selectedTrack == -1) {
+                    cur->trackName = gQMarkPtr;
+                } else {
+                    cur->trackName = level_name(trackMenuIds[((trackY * 6) + trackX)]);
+                    if (trackX == 4) {
+                        if ((((settings->trophies) >> (trackY * 2)) & 3) == 3) {
+                            cur->visible = 2;
+                        }
+                    } else if ((settings->courseFlagsPtr[trackMenuIds[((trackY * 6) + trackX)]] & 2)) {
+                        cur->visible = 2;
+                    }
+                }

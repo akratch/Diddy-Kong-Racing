@@ -1,0 +1,3 @@
+#pragma distinct (*cur, gTrackSelectIDs[])
+                cur->hubName = levelName;
+                if (gTrackSelectIDs[trackY][trackX] != -1) {
