@@ -147,6 +147,15 @@ Example: `./diff.sh menu_init`
 
 ---
 
+#### `tools/decomp-workbench`
+
+Portable late-stage decompilation tools for comparing and ranking MIPS object
+files, compiling candidate sweeps, and adding opt-in tracing to a statically
+recompiled IDO ugen. See
+[`tools/decomp-workbench/README.md`](tools/decomp-workbench/README.md).
+
+---
+
 #### `./rename.sh <old_name> <new_name>`
 
 This script will rename an existing symbol, file name, and/or folder name within the repo with a new one.
