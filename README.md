@@ -149,9 +149,9 @@ Example: `./diff.sh menu_init`
 
 #### `tools/decomp-workbench`
 
-Portable late-stage decompilation tools for comparing and ranking MIPS object
-files, compiling candidate sweeps, and adding opt-in tracing to a statically
-recompiled IDO ugen. See
+Portable late-stage decompilation tools for relocation-aware MIPS object
+comparison, cached candidate campaigns, compiler trace analysis, guarded IDO
+static-recomp instrumentation, and retained-pass replay. See
 [`tools/decomp-workbench/README.md`](tools/decomp-workbench/README.md).
 
 ---
